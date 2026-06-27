@@ -102,13 +102,10 @@ def _manager_btn() -> InlineKeyboardButton:
 
 def kb_after_choose(order_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Получить полную версию", callback_data=f"pay:{order_id}")],
+        [InlineKeyboardButton(text="🎵 Получить полную песню — 399 грн", callback_data=f"pay:{order_id}")],
         [_manager_btn()],
     ])
 
-
-def kb_payment(order_id: str) -> InlineKeyboardMarkup:
-    return _kb(("💳 Оплатить", f"do_pay:{order_id}"))
 
 
 def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
@@ -395,20 +392,16 @@ async def cb_pay(call: CallbackQuery) -> None:
     if order["status"] == "paid":
         await call.answer("Этот заказ уже оплачен.", show_alert=True)
         return
+    url = build_payment_url(order_id, call.from_user.id)
     await call.message.answer(
-        "Полная версия песни — 349 грн.\n"
+        "Полная версия песни — 399 грн.\n"
         "После оплаты бот сразу отправит вам полный трек.\n",
-        reply_markup=kb_payment(order_id),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💳 Оплатить 399 грн", url=url)],
+        ]),
     )
     await call.answer()
 
-
-@router.callback_query(F.data.startswith("do_pay:"))
-async def cb_do_pay(call: CallbackQuery) -> None:
-    order_id = call.data.split(":", 1)[1]
-    url = build_payment_url(order_id, call.from_user.id)
-    await call.message.answer(f"Перейдите по ссылке для оплаты:\n{url}")
-    await call.answer()
 
 
 @router.callback_query(F.data.startswith("bank:"))
