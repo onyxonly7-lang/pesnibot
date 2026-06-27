@@ -1,1 +1,1 @@
-worker: python run_polling.py
+web: python bot/main.py
