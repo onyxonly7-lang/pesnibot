@@ -58,6 +58,7 @@ def build_payment_url(order_id: str, user_id: int) -> str:
         "serviceUrl": _SERVICE_URL,
         "language": "RU",
         "paymentSystems": "card;googlePay;applePay",
+        "productLogoUrl": "https://i.imgur.com/YVeJq9p.jpeg",
     }
     return _WFP_PAY_URL + "?" + urllib.parse.urlencode(params)
 
