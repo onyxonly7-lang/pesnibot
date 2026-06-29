@@ -355,10 +355,7 @@ async def cb_request_preview(call: CallbackQuery, state: FSMContext, bot: Bot) -
     await bot.send_message(ADMIN_CHAT_ID, admin_text)
     await bot.send_message(
         ADMIN_CHAT_ID,
-        "Завантажте два аудіофайли.\n"
-        "У назві першого файлу має бути цифра 1,\n"
-        "другого — цифра 2.\n"
-        "Наприклад: track_1.mp3 і track_2.mp3"
+        "Завантажте 2 аудіофайли"
     )
 
 
