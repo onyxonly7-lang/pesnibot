@@ -161,6 +161,15 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
 
 # ── /upload_examples ──────────────────────────────────────────────────────
 
+@router.message(Command("clear_examples"))
+async def cmd_clear_examples(message: Message) -> None:
+    if not _is_admin(message.from_user.id):
+        return
+    for key in _EXAMPLE_KEYS:
+        await db.set_setting(key, "")
+    await message.answer("🗑 Всі приклади пісень видалено.")
+
+
 @router.message(Command("upload_examples"))
 async def cmd_upload_examples(message: Message, state: FSMContext) -> None:
     if not _is_admin(message.from_user.id):
