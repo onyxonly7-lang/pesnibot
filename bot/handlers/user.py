@@ -103,7 +103,7 @@ def _manager_btn() -> InlineKeyboardButton:
 
 def kb_after_choose(order_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎵 Отримати повну пісню — 399 грн", callback_data=f"pay:{order_id}")],
+        [InlineKeyboardButton(text="🎵 Отримати повну пісню — 349 грн", callback_data=f"pay:{order_id}")],
         [_manager_btn()],
     ])
 
@@ -398,10 +398,10 @@ async def cb_pay(call: CallbackQuery) -> None:
         return
     url = build_payment_url(order_id, call.from_user.id)
     await call.message.answer(
-        "Повна версія пісні — 399 грн.\n"
+        "Повна версія пісні — 349 грн.\n"
         "Після оплати бот одразу надішле вам повний трек.\n",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатити 399 грн", url=url)],
+            [InlineKeyboardButton(text="💳 Оплатити 349 грн", url=url)],
         ]),
     )
     await call.answer()
