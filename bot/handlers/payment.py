@@ -40,6 +40,8 @@ async def pay_page(request: web.Request) -> web.Response:
                 border-top-color: #4a90e2; border-radius: 50%;
                 animation: spin 0.8s linear infinite; margin: 0 auto 16px; }}
     @keyframes spin {{ to {{ transform: rotate(360deg); }} }}
+    .btn {{ margin-top: 24px; padding: 14px 28px; background: #4a90e2; color: #fff;
+            border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }}
   </style>
 </head>
 <body>
@@ -48,9 +50,26 @@ async def pay_page(request: web.Request) -> web.Response:
     <p>Переходимо до оплати...</p>
     <form id="wfp" method="POST" action="https://secure.wayforpay.com/pay">
       {fields_html}
+      <noscript>
+        <button class="btn" type="submit">Перейти до оплати</button>
+      </noscript>
     </form>
+    <button class="btn" id="btn" style="display:none" onclick="document.getElementById('wfp').submit()">
+      Перейти до оплати
+    </button>
   </div>
-  <script>document.getElementById("wfp").submit();</script>
+  <script>
+    window.onload = function() {{
+      try {{
+        document.getElementById("wfp").submit();
+      }} catch(e) {{
+        document.getElementById("btn").style.display = "inline-block";
+      }}
+    }};
+    setTimeout(function() {{
+      document.getElementById("btn").style.display = "inline-block";
+    }}, 1500);
+  </script>
 </body>
 </html>"""
     return web.Response(content_type="text/html", text=page)

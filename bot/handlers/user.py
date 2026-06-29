@@ -222,8 +222,7 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(data["order_id"], voice=voice)
     await state.set_state(OrderForm.story)
     await call.message.answer(
-        "✨ Чудово! А тепер найважливіше — розкажіть про цю людину.\n"
-        "Саме від цього залежить ваша пісня."
+        "А тепер найважливіше — саме від цього залежить ваша пісня."
     )
     await call.message.answer(
         "🎵 Розкажіть, що робить цю людину особливою:\n"
@@ -283,7 +282,7 @@ async def cb_edit_lyrics(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer("Правку вже було використано.", show_alert=True)
         return
     await state.set_state(OrderForm.awaiting_edit)
-    await call.message.answer("Напишіть що змінити — слово, фразу або загальний напрямок. Чим детальніше, тим краще результат ✨")
+    await call.message.answer("Напишіть що змінити — слово, фразу або загальний напрямок. Чим детальніше, тим кращий результат.")
     await call.answer()
 
 
@@ -384,7 +383,7 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         "Натисніть кнопку нижче, щоб оплатити та отримати\n"
         "повну версію пісні одразу після оплати.\n",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатити повну пісню — 349 грн", url=pay_url)],
+            [InlineKeyboardButton(text="💳 Оплатити пісню — 349 грн", url=pay_url)],
             [_manager_btn()],
         ]),
     )
