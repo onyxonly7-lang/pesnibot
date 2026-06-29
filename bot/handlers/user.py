@@ -147,17 +147,17 @@ async def cb_how(call: CallbackQuery) -> None:
 async def cb_examples(call: CallbackQuery, bot: Bot) -> None:
     await call.answer()
     uid = call.from_user.id
-    examples = [
-        ("EXAMPLE_SONG_WIFE",    "🎵 Пісня для дружини"),
-        ("EXAMPLE_SONG_HUSBAND", "🎵 Пісня для чоловіка"),
-        ("EXAMPLE_SONG_FRIEND",  "🎵 Пісня для подруги"),
-        ("EXAMPLE_SONG_MOM",     "🎵 Пісня для мами"),
+    example_keys = [
+        "EXAMPLE_SONG_WIFE",
+        "EXAMPLE_SONG_HUSBAND",
+        "EXAMPLE_SONG_FRIEND",
+        "EXAMPLE_SONG_MOM",
     ]
     any_sent = False
-    for key, caption in examples:
+    for key in example_keys:
         file_id = await db.get_setting(key)
         if file_id:
-            await bot.send_audio(uid, audio=file_id, caption=caption)
+            await bot.send_audio(uid, audio=file_id)
             any_sent = True
     if not any_sent:
         await bot.send_message(uid, "Приклади поки не завантажені. Зверніться до менеджера.")
