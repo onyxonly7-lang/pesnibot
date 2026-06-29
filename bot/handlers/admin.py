@@ -47,30 +47,28 @@ async def handle_admin_audio(message: Message, bot: Bot) -> None:
     variant = _detect_variant(filename)
     if variant is None:
         await message.answer(
-            f"⚠️ Не могу определить номер варианта по имени файла «{filename}».\n"
-            "В названии должна быть цифра 1 или 2. Например: track_1.mp3"
+            f"⚠️ Не можу визначити номер варіанту за назвою файлу «{filename}».\n"
+            "У назві має бути цифра 1 або 2. Наприклад: track_1.mp3"
         )
         return
 
-    # Find the latest order that needs audio
     order = await _find_active_order()
     if not order:
-        await message.answer("⚠️ Нет активных заказов в статусе preview_sent.")
+        await message.answer("⚠️ Немає активних замовлень зі статусом preview_sent.")
         return
 
     order_id = order["id"]
     file_id = audio.file_id
     await db.update_order(order_id, **{f"variant{variant}_file_id": file_id})
-    await message.answer(f"✅ Вариант {variant} сохранён для {order_id}.")
+    await message.answer(f"✅ Варіант {variant} збережено для {order_id}.")
 
-    # Reload order to check if both variants are now present
     order = await db.get_order(order_id)
     if order["variant1_file_id"] and order["variant2_file_id"]:
-        await message.answer(f"✅ Оба варианта загружены. Отправляю превью клиенту...")
+        await message.answer(f"✅ Обидва варіанти завантажено. Надсилаю превью клієнту...")
         await _send_previews_to_client(bot, order)
     else:
         missing = 2 if not order["variant2_file_id"] else 1
-        await message.answer(f"⏳ Жду вариант {missing}...")
+        await message.answer(f"⏳ Чекаю варіант {missing}...")
 
 
 async def _find_active_order() -> dict | None:
@@ -110,8 +108,8 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
 
     await bot.send_message(
         user_id,
-        "🎧 Ваше музыкальное превью готово.\n\n"
-        "Послушайте два варианта и выберите тот, который понравился больше.",
+        "🎧 Ваше музичне превью готове.\n\n"
+        "Послухайте два варіанти і оберіть той, який сподобався більше.",
     )
 
     all_ok = True
@@ -125,20 +123,20 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
             await bot.send_audio(
                 user_id,
                 audio=audio_input,
-                caption=f"🎵 Вариант {variant_num}",
+                caption=f"🎵 Варіант {variant_num}",
             )
         except Exception:
             log.exception("Preview error: variant=%s order=%s", variant_num, order_id)
-            await bot.send_message(user_id, f"(Вариант {variant_num} — ошибка генерации превью)")
+            await bot.send_message(user_id, f"(Варіант {variant_num} — помилка генерації превью)")
             all_ok = False
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎵 Выбираю вариант 1", callback_data="choose:1")],
-        [InlineKeyboardButton(text="🎵 Выбираю вариант 2", callback_data="choose:2")],
+        [InlineKeyboardButton(text="🎵 Обираю варіант 1", callback_data="choose:1")],
+        [InlineKeyboardButton(text="🎵 Обираю варіант 2", callback_data="choose:2")],
     ])
     await bot.send_message(
         user_id,
-        "Какой вариант вам больше понравился?\n",
+        "Який варіант вам більше сподобався?\n",
         reply_markup=kb,
     )
 

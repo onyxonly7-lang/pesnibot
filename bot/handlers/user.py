@@ -27,24 +27,25 @@ ASSETS = Path(__file__).parent.parent.parent / "assets"
 
 _SEPARATOR = "➖➖➖➖➖➖➖➖➖➖"
 
+
 def _is_ukrainian(text: str) -> bool:
-    """Detect Ukrainian by presence of Ukrainian-specific letters."""
     ua_chars = set("іїєґІЇЄҐ")
     return bool(ua_chars.intersection(text))
+
 
 def _after_lyrics_text(lyrics: str) -> str:
     return (
         f"\n\n\n{_SEPARATOR}\n\n"
-        "🎵 Это лишь текст — в музыке и голосе\n"
-        "песня раскроется совсем иначе.\n\n"
-        "Вы можете внести правки или сразу\n"
-        "создать музыкальное превью."
+        "🎵 Це лише текст — у музиці та голосі\n"
+        "пісня розкриється зовсім інакше.\n\n"
+        "Ви можете внести правки або одразу\n"
+        "створити музичне превью."
     )
+
 
 # ── keyboard helper ────────────────────────────────────────────────────────
 
 def _kb(*buttons: tuple[str, str]) -> InlineKeyboardMarkup:
-    """Each tuple becomes its own row (one column layout)."""
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=t, callback_data=d)] for t, d in buttons]
     )
@@ -53,65 +54,64 @@ def _kb(*buttons: tuple[str, str]) -> InlineKeyboardMarkup:
 # ── static keyboards ───────────────────────────────────────────────────────
 
 KB_START = _kb(
-    ("🎵 Создать песню", "start_order"),
-    ("🎧 Примеры песен", "examples"),
-    ("❓ Как это работает", "how_it_works"),
+    ("🎵 Створити пісню", "start_order"),
+    ("🎧 Приклади пісень", "examples"),
+    ("❓ Як це працює", "how_it_works"),
 )
 
 KB_AFTER_EXAMPLES = _kb(
-    ("🎵 Создать песню", "start_order"),
-    ("❓ Как это работает", "how_it_works"),
+    ("🎵 Створити пісню", "start_order"),
+    ("❓ Як це працює", "how_it_works"),
 )
 
-KB_HOW = _kb(("🎵 Создать песню", "start_order"))
+KB_HOW = _kb(("🎵 Створити пісню", "start_order"))
 
 KB_RECIPIENT = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Мужу", callback_data="r:Мужу"),       InlineKeyboardButton(text="Жене",    callback_data="r:Жене")],
-    [InlineKeyboardButton(text="Парню", callback_data="r:Парню"),     InlineKeyboardButton(text="Девушке", callback_data="r:Девушке")],
-    [InlineKeyboardButton(text="Маме", callback_data="r:Маме"),       InlineKeyboardButton(text="Подруге", callback_data="r:Подруге")],
-    [InlineKeyboardButton(text="Ребёнку", callback_data="r:Ребёнку"), InlineKeyboardButton(text="Другое",  callback_data="r:Другое")],
+    [InlineKeyboardButton(text="Чоловіку",  callback_data="r:Чоловіку"),  InlineKeyboardButton(text="Дружині",  callback_data="r:Дружині")],
+    [InlineKeyboardButton(text="Хлопцю",    callback_data="r:Хлопцю"),    InlineKeyboardButton(text="Дівчині",  callback_data="r:Дівчині")],
+    [InlineKeyboardButton(text="Мамі",      callback_data="r:Мамі"),      InlineKeyboardButton(text="Подрузі",  callback_data="r:Подрузі")],
+    [InlineKeyboardButton(text="Дитині",    callback_data="r:Дитині"),    InlineKeyboardButton(text="Інше",     callback_data="r:Інше")],
 ])
 
 KB_OCCASION = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="День рождения", callback_data="o:День рождения"), InlineKeyboardButton(text="Годовщина",    callback_data="o:Годовщина")],
-    [InlineKeyboardButton(text="Признание",     callback_data="o:Признание"),     InlineKeyboardButton(text="Благодарность", callback_data="o:Благодарность")],
-    [InlineKeyboardButton(text="Извинения",     callback_data="o:Извинения"),     InlineKeyboardButton(text="Другой повод", callback_data="o:Другой повод")],
+    [InlineKeyboardButton(text="День народження", callback_data="o:День народження"), InlineKeyboardButton(text="Річниця",      callback_data="o:Річниця")],
+    [InlineKeyboardButton(text="Освідчення",      callback_data="o:Освідчення"),      InlineKeyboardButton(text="Подяка",       callback_data="o:Подяка")],
+    [InlineKeyboardButton(text="Вибачення",       callback_data="o:Вибачення"),       InlineKeyboardButton(text="Інший привід", callback_data="o:Інший привід")],
 ])
 
 KB_VOICE = _kb(
-    ("Мужской", "v:Мужской"),
-    ("Женский", "v:Женский"),
-    ("Мужской + женский", "v:Мужской + женский"),
+    ("Чоловічий", "v:Чоловічий"),
+    ("Жіночий", "v:Жіночий"),
+    ("Чоловічий + жіночий", "v:Чоловічий + жіночий"),
 )
 
-KB_GENERATE = _kb(("📝 Создать текст песни", "generate_lyrics"))
+KB_GENERATE = _kb(("📝 Створити текст пісні", "generate_lyrics"))
 
 
 def kb_lyrics(can_edit: bool) -> InlineKeyboardMarkup:
     buttons = []
     if can_edit:
         buttons.append(("✏️ Внести правки", "edit_lyrics"))
-    buttons.append(("🎵 Создать музыкальное превью", "request_preview"))
+    buttons.append(("🎵 Створити музичне превью", "request_preview"))
     return _kb(*buttons)
 
 
 def _manager_btn() -> InlineKeyboardButton:
     username = MANAGER_USERNAME.lstrip("@")
-    return InlineKeyboardButton(text="💬 Написать менеджеру", url=f"https://t.me/{username}")
+    return InlineKeyboardButton(text="💬 Написати менеджеру", url=f"https://t.me/{username}")
 
 
 def kb_after_choose(order_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎵 Получить полную песню — 399 грн", callback_data=f"pay:{order_id}")],
+        [InlineKeyboardButton(text="🎵 Отримати повну пісню — 399 грн", callback_data=f"pay:{order_id}")],
         [_manager_btn()],
     ])
 
 
-
 def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="💳 Повторить оплату", callback_data=f"pay:{order_id}")],
-        [InlineKeyboardButton(text="🏦 Банковский перевод", callback_data=f"bank:{order_id}")],
+        [InlineKeyboardButton(text="💳 Повторити оплату", callback_data=f"pay:{order_id}")],
+        [InlineKeyboardButton(text="🏦 Банківський переказ", callback_data=f"bank:{order_id}")],
         [_manager_btn()],
     ])
 
@@ -121,9 +121,9 @@ def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
 async def _send_start(message: Message, state: FSMContext) -> None:
     await state.clear()
     await message.answer(
-        "🎵 Создайте персональную песню по своей истории.\n\n"
-        "Сначала вы получите бесплатное музыкальное превью.\n"
-        "Оплачивайте только если песня понравится.\n",
+        "🎵 Створіть персональну пісню за своєю історією.\n\n"
+        "Спочатку ви отримаєте безкоштовне музичне превью.\n"
+        "Оплачуйте лише якщо пісня сподобається.\n",
         reply_markup=KB_START,
     )
 
@@ -133,7 +133,7 @@ async def cmd_start(message: Message, state: FSMContext) -> None:
     await _send_start(message, state)
 
 
-@router.message(F.text.lower().in_({"start", "старт", "начать", "привет", "hi", "hello"}))
+@router.message(F.text.lower().in_({"start", "старт", "начать", "привет", "hi", "hello", "почати", "привіт"}))
 async def cmd_start_text(message: Message, state: FSMContext) -> None:
     await _send_start(message, state)
 
@@ -143,13 +143,13 @@ async def cmd_start_text(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "how_it_works")
 async def cb_how(call: CallbackQuery) -> None:
     await call.message.answer(
-        "1️⃣ Расскажите, для кого песня и по какому поводу.\n"
-        "2️⃣ Добавьте историю, воспоминания и пожелания.\n"
-        "3️⃣ Получите готовый текст песни.\n"
-        "4️⃣ При необходимости внесите одну правку.\n"
-        "5️⃣ Получите два бесплатных музыкальных превью.\n"
-        "6️⃣ Выберите понравившийся вариант.\n"
-        "7️⃣ Оплатите и получите полную версию песни.\n",
+        "1️⃣ Розкажіть, для кого пісня і з якого приводу.\n"
+        "2️⃣ Додайте історію, спогади та побажання.\n"
+        "3️⃣ Отримайте готовий текст пісні.\n"
+        "4️⃣ За потреби внесіть одне виправлення.\n"
+        "5️⃣ Отримайте два безкоштовних музичних превью.\n"
+        "6️⃣ Оберіть варіант, який сподобався.\n"
+        "7️⃣ Оплатіть і отримайте повну версію пісні.\n",
         reply_markup=KB_HOW,
     )
     await call.answer()
@@ -160,17 +160,17 @@ async def cb_examples(call: CallbackQuery, bot: Bot) -> None:
     await call.answer()
     uid = call.from_user.id
     examples = [
-        ("example_mom.mp3", "🎵 Песня для мамы"),
-        ("example_beloved_female.mp3", "💕 Песня для любимой"),
-        ("example_beloved_male.mp3", "🎸 Песня для любимого"),
+        ("example_mom.mp3", "🎵 Пісня для мами"),
+        ("example_beloved_female.mp3", "💕 Пісня для коханої"),
+        ("example_beloved_male.mp3", "🎸 Пісня для коханого"),
     ]
     for filename, caption in examples:
         path = ASSETS / filename
         if path.exists():
             await bot.send_audio(uid, audio=FSInputFile(str(path)), caption=caption)
         else:
-            await bot.send_message(uid, f"{caption} — пока не загружена.")
-    await bot.send_message(uid, "Хотите создать свою?\n", reply_markup=KB_AFTER_EXAMPLES)
+            await bot.send_message(uid, f"{caption} — поки не завантажена.")
+    await bot.send_message(uid, "Хочете створити свою?\n", reply_markup=KB_AFTER_EXAMPLES)
 
 
 # ── order flow ────────────────────────────────────────────────────────────
@@ -187,8 +187,8 @@ async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
     #     count = await db.count_orders_last_24h(call.from_user.id)
     #     if count >= 2:
     #         await call.message.answer(
-    #             "Вы уже создали 2 песни сегодня.\n"
-    #             "Попробуйте завтра или напишите менеджеру.\n",
+    #             "Ви вже створили 2 пісні сьогодні.\n"
+    #             "Спробуйте завтра або напишіть менеджеру.\n",
     #             reply_markup=_kb_limit_reached(),
     #         )
     #         await call.answer()
@@ -197,7 +197,7 @@ async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
     order_id = await db.create_order(call.from_user.id, call.from_user.username or "")
     await state.update_data(order_id=order_id)
     await state.set_state(OrderForm.recipient)
-    await call.message.answer("Для кого песня?\n", reply_markup=KB_RECIPIENT)
+    await call.message.answer("Для кого пісня?\n", reply_markup=KB_RECIPIENT)
     await call.answer()
 
 
@@ -208,7 +208,7 @@ async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], recipient=recipient)
     await state.set_state(OrderForm.occasion)
-    await call.message.answer("По какому поводу?\n", reply_markup=KB_OCCASION)
+    await call.message.answer("З якого приводу?\n", reply_markup=KB_OCCASION)
     await call.answer()
 
 
@@ -219,7 +219,7 @@ async def cb_occasion(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], occasion=occasion)
     await state.set_state(OrderForm.voice)
-    await call.message.answer("Какой голос нужен?\n", reply_markup=KB_VOICE)
+    await call.message.answer("Який голос потрібен?\n", reply_markup=KB_VOICE)
     await call.answer()
 
 
@@ -231,10 +231,11 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(data["order_id"], voice=voice)
     await state.set_state(OrderForm.story)
     await call.message.answer(
-        "Расскажите всё, что поможет создать песню именно про вашего человека:\n"
-        "имя, характер, увлечения, ваши воспоминания, тёплые или смешные моменты,\n"
-        "важные фразы и пожелания.\n\n"
-        "Пишите свободно, как чувствуете."
+        "🎵 Розкажіть, що робить цю людину особливою:\n"
+        "ім'я або як ви її/його називаєте, характер, захоплення,\n"
+        "ваші теплі або смішні моменти і спогади,\n"
+        "важливі фрази та побажання.\n\n"
+        "Пишіть вільно, як відчуваєте 💛"
     )
     await call.answer()
 
@@ -247,7 +248,7 @@ async def msg_story(message: Message, state: FSMContext) -> None:
     await db.update_order(data["order_id"], story=story)
     await state.set_state(OrderForm.confirm_story)
     await message.answer(
-        "Отлично! Нажмите кнопку, чтобы создать текст песни.\n",
+        "Чудово! Натисніть кнопку, щоб створити текст пісні.\n",
         reply_markup=KB_GENERATE,
     )
 
@@ -256,7 +257,7 @@ async def msg_story(message: Message, state: FSMContext) -> None:
 async def cb_generate_lyrics(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await call.answer()
-    wait_msg = await call.message.answer("⏳ Анализируем вашу историю...")
+    wait_msg = await call.message.answer("⏳ Аналізуємо вашу історію...")
     try:
         lyrics = await gpt.generate_lyrics(
             data["recipient"], data["occasion"], data["voice"], data["story"]
@@ -264,13 +265,13 @@ async def cb_generate_lyrics(call: CallbackQuery, state: FSMContext) -> None:
     except Exception as e:
         log.exception("GPT error")
         await wait_msg.delete()
-        await call.message.answer(f"Ошибка генерации текста: {e}")
+        await call.message.answer(f"Помилка генерації тексту: {e}")
         return
     await db.update_order(data["order_id"], lyrics=lyrics)
     await state.update_data(lyrics=lyrics)
     await wait_msg.delete()
     await call.message.answer(
-        f"Ваш текст песни готов.\n\n{lyrics}" + _after_lyrics_text(lyrics),
+        f"Ваш текст пісні готовий.\n\n{lyrics}" + _after_lyrics_text(lyrics),
         reply_markup=kb_lyrics(can_edit=True),
     )
 
@@ -280,13 +281,13 @@ async def cb_edit_lyrics(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     order = await db.get_order(data.get("order_id", ""))
     if not order:
-        await call.answer("Заказ не найден.", show_alert=True)
+        await call.answer("Замовлення не знайдено.", show_alert=True)
         return
     if order["edit_used"]:
-        await call.answer("Правка уже была использована.", show_alert=True)
+        await call.answer("Правку вже було використано.", show_alert=True)
         return
     await state.set_state(OrderForm.awaiting_edit)
-    await call.message.answer("Что именно хотите изменить в тексте? Напишите одним сообщением.")
+    await call.message.answer("Що саме хочете змінити в тексті? Напишіть одним повідомленням.")
     await call.answer()
 
 
@@ -295,20 +296,22 @@ async def msg_edit(message: Message, state: FSMContext) -> None:
     data = await state.get_data()
     order = await db.get_order(data.get("order_id", ""))
     if not order or order["edit_used"]:
-        await message.answer("Правка уже была использована.")
+        await message.answer("Правку вже було використано.")
         return
-    await message.answer("⏳ Вношу правку...")
+    wait_msg = await message.answer("⏳ Вношу правку...")
     try:
         new_lyrics = await gpt.edit_lyrics(order["lyrics"], message.text or "", recipient=order.get("recipient", ""))
     except Exception as e:
         log.exception("GPT edit error")
-        await message.answer(f"Ошибка: {e}")
+        await wait_msg.delete()
+        await message.answer(f"Помилка: {e}")
         return
     await db.update_order(order["id"], lyrics=new_lyrics, edit_used=1)
     await state.update_data(lyrics=new_lyrics)
     await state.set_state(OrderForm.confirm_story)
+    await wait_msg.delete()
     await message.answer(
-        f"Ваш обновлённый текст песни:\n\n{new_lyrics}" + _after_lyrics_text(new_lyrics),
+        f"Ваш оновлений текст пісні:\n\n{new_lyrics}" + _after_lyrics_text(new_lyrics),
         reply_markup=kb_lyrics(can_edit=False),
     )
 
@@ -319,7 +322,7 @@ async def cb_request_preview(call: CallbackQuery, state: FSMContext, bot: Bot) -
     order_id = data.get("order_id", "")
     order = await db.get_order(order_id)
     if not order:
-        await call.answer("Заказ не найден.", show_alert=True)
+        await call.answer("Замовлення не знайдено.", show_alert=True)
         return
 
     await db.update_order(order_id, status="preview_sent")
@@ -327,40 +330,39 @@ async def cb_request_preview(call: CallbackQuery, state: FSMContext, bot: Bot) -
     await call.answer()
 
     await call.message.answer(
-        "🎧 Мы создаём для вас музыкальное превью.\n"
-        "Обычно превью готово в течение 10–15 минут."
+        "🎧 Ми створюємо для вас музичне превью.\n"
+        "Зазвичай превью готове протягом 10–15 хвилин."
     )
 
     progress = [
-        "✅ Анализируем историю",
-        "✅ Подбираем настроение песни",
-        "✅ Создаём музыку",
-        "⏳ Готовим превью...",
+        "✅ Аналізуємо історію",
+        "✅ Підбираємо настрій пісні",
+        "✅ Створюємо музику",
+        "⏳ Готуємо превью...",
     ]
     for step in progress:
         await asyncio.sleep(20)
         await call.message.answer(step)
 
-    # Уведомление только в ADMIN_CHAT_ID
     admin_text = (
-        f"🎵 Новый заказ на музыкальное превью\n\n"
-        f"Заказ: {order_id}\n"
+        f"🎵 Нове замовлення на музичне превью\n\n"
+        f"Замовлення: {order_id}\n"
         f"Telegram: @{order['username']} / {order['user_id']}\n"
         f"Кому: {order['recipient']}\n"
-        f"Повод: {order['occasion']}\n"
+        f"Привід: {order['occasion']}\n"
         f"Голос: {order['voice']}\n\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📝 Текст песни:\n"
+        f"📝 Текст пісні:\n"
         f"{order['lyrics']}\n"
         f"━━━━━━━━━━━━━━━"
     )
     await bot.send_message(ADMIN_CHAT_ID, admin_text)
     await bot.send_message(
         ADMIN_CHAT_ID,
-        "Загрузите два аудиофайла.\n"
-        "В названии первого файла должна быть цифра 1,\n"
-        "второго — цифра 2.\n"
-        "Например: track_1.mp3 и track_2.mp3"
+        "Завантажте два аудіофайли.\n"
+        "У назві першого файлу має бути цифра 1,\n"
+        "другого — цифра 2.\n"
+        "Наприклад: track_1.mp3 і track_2.mp3"
     )
 
 
@@ -377,8 +379,8 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
             order_id = order["id"]
     await db.update_order(order_id, chosen_variant=variant, status="chosen")
     await call.message.answer(
-        f"Вы выбрали вариант {variant}.\n"
-        "Полная версия песни будет доступна после оплаты.\n",
+        f"Ви обрали варіант {variant}.\n"
+        "Повна версія пісні буде доступна після оплати.\n",
         reply_markup=kb_after_choose(order_id),
     )
     await call.answer()
@@ -389,21 +391,20 @@ async def cb_pay(call: CallbackQuery) -> None:
     order_id = call.data.split(":", 1)[1]
     order = await db.get_order(order_id)
     if not order:
-        await call.answer("Заказ не найден.", show_alert=True)
+        await call.answer("Замовлення не знайдено.", show_alert=True)
         return
     if order["status"] == "paid":
-        await call.answer("Этот заказ уже оплачен.", show_alert=True)
+        await call.answer("Це замовлення вже оплачено.", show_alert=True)
         return
     url = build_payment_url(order_id, call.from_user.id)
     await call.message.answer(
-        "Полная версия песни — 399 грн.\n"
-        "После оплаты бот сразу отправит вам полный трек.\n",
+        "Повна версія пісні — 399 грн.\n"
+        "Після оплати бот одразу надішле вам повний трек.\n",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатить 399 грн", url=url)],
+            [InlineKeyboardButton(text="💳 Оплатити 399 грн", url=url)],
         ]),
     )
     await call.answer()
-
 
 
 @router.callback_query(F.data.startswith("bank:"))
@@ -411,10 +412,10 @@ async def cb_bank(call: CallbackQuery) -> None:
     from bot.config import IBAN
     order_id = call.data.split(":", 1)[1]
     await call.message.answer(
-        f"Реквизиты для оплаты:\n"
+        f"Реквізити для оплати:\n"
         f"IBAN: {IBAN}\n"
-        f"Назначение платежа: {order_id}\n\n"
-        f"После оплаты отправьте скриншот менеджеру.",
+        f"Призначення платежу: {order_id}\n\n"
+        f"Після оплати надішліть скриншот менеджеру.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
     )
     await call.answer()
@@ -428,7 +429,7 @@ async def cmd_paid(message: Message, bot: Bot) -> None:
         return
     parts = (message.text or "").split()
     if len(parts) < 2:
-        await message.answer("Использование: /paid ORDER-XXXX")
+        await message.answer("Використання: /paid ORDER-XXXX")
         return
     order_id = parts[1].upper()
     await _deliver_full_track(bot, order_id, message)
@@ -438,20 +439,20 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
     order = await db.get_order(order_id)
     if not order:
         if reply_to:
-            await reply_to.answer("Заказ не найден.")
+            await reply_to.answer("Замовлення не знайдено.")
         return
     if order["status"] == "paid":
-        return  # идемпотентность
+        return
 
     variant = order["chosen_variant"] or 1
     file_id = order[f"variant{variant}_file_id"]
     if not file_id:
         if reply_to:
-            await reply_to.answer("Файл ещё не загружен.")
+            await reply_to.answer("Файл ще не завантажено.")
         return
 
     await db.update_order(order_id, status="paid")
-    await bot.send_audio(order["user_id"], audio=file_id, caption="🎵 Ваша полная версия песни!")
+    await bot.send_audio(order["user_id"], audio=file_id, caption="🎵 Ваша повна версія пісні!")
 
 
 deliver_full_track = _deliver_full_track
