@@ -255,18 +255,20 @@ async def msg_story(message: Message, state: FSMContext) -> None:
 @router.callback_query(F.data == "generate_lyrics", OrderForm.confirm_story)
 async def cb_generate_lyrics(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
-    await call.message.answer("⏳ Создаю текст песни, подождите...")
     await call.answer()
+    wait_msg = await call.message.answer("⏳ Анализируем вашу историю...")
     try:
         lyrics = await gpt.generate_lyrics(
             data["recipient"], data["occasion"], data["voice"], data["story"]
         )
     except Exception as e:
         log.exception("GPT error")
+        await wait_msg.delete()
         await call.message.answer(f"Ошибка генерации текста: {e}")
         return
     await db.update_order(data["order_id"], lyrics=lyrics)
     await state.update_data(lyrics=lyrics)
+    await wait_msg.delete()
     await call.message.answer(
         f"Ваш текст песни готов.\n\n{lyrics}" + _after_lyrics_text(lyrics),
         reply_markup=kb_lyrics(can_edit=True),
