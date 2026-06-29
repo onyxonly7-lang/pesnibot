@@ -157,7 +157,7 @@ async def cb_examples(call: CallbackQuery, bot: Bot) -> None:
     for key, title in examples:
         file_id = await db.get_setting(key)
         if file_id:
-            await bot.send_audio(uid, audio=file_id, title=title, performer="Studio 24")
+            await bot.send_audio(uid, audio=file_id, title=title)
             any_sent = True
     if not any_sent:
         await bot.send_message(uid, "Приклади поки не завантажені. Зверніться до менеджера.")
@@ -431,7 +431,7 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
         return
 
     await db.update_order(order_id, status="paid")
-    await bot.send_audio(order["user_id"], audio=file_id, title="Ваша пісня", performer="Studio 24")
+    await bot.send_audio(order["user_id"], audio=file_id, title="Ваша пісня")
 
 
 deliver_full_track = _deliver_full_track
