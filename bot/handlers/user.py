@@ -37,8 +37,7 @@ def _after_lyrics_text(lyrics: str) -> str:
         f"\n\n\n{_SEPARATOR}\n\n"
         "🎵 Це лише текст — у музиці та голосі\n"
         "пісня розкриється зовсім інакше.\n\n"
-        "Ви можете внести правки або одразу\n"
-        "створити музичне превью."
+        "Ви можете внести правки або одразу створити музичне превью.\n"
     )
 
 
@@ -116,7 +115,7 @@ async def _send_start(message: Message, state: FSMContext) -> None:
     await message.answer(
         "🎵 Створіть персональну пісню за своєю історією.\n\n"
         "Спочатку ви отримаєте безкоштовне музичне превью.\n"
-        "Оплачуйте лише якщо пісня сподобається.\n",
+        "Оплачуйте лише якщо пісня сподобається. 🎁\n",
         reply_markup=KB_START,
     )
 
@@ -142,7 +141,7 @@ async def cb_how(call: CallbackQuery) -> None:
         "4️⃣ За потреби внесіть одне виправлення.\n"
         "5️⃣ Отримайте два безкоштовних музичних превью.\n"
         "6️⃣ Оберіть варіант, який сподобався.\n"
-        "7️⃣ Оплатіть і отримайте повну версію пісні.\n",
+        "7️⃣ Оплатіть і отримайте повну версію пісні.\n\n",
         reply_markup=KB_HOW,
     )
     await call.answer()
@@ -190,7 +189,7 @@ async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
     order_id = await db.create_order(call.from_user.id, call.from_user.username or "")
     await state.update_data(order_id=order_id)
     await state.set_state(OrderForm.recipient)
-    await call.message.answer("Для кого пісня?\n", reply_markup=KB_RECIPIENT)
+    await call.message.answer("Для кого пісня?\n\n", reply_markup=KB_RECIPIENT)
     await call.answer()
 
 
@@ -201,7 +200,7 @@ async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], recipient=recipient)
     await state.set_state(OrderForm.occasion)
-    await call.message.answer("З якого приводу?\n", reply_markup=KB_OCCASION)
+    await call.message.answer("З якого приводу?\n\n", reply_markup=KB_OCCASION)
     await call.answer()
 
 
@@ -212,7 +211,7 @@ async def cb_occasion(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], occasion=occasion)
     await state.set_state(OrderForm.voice)
-    await call.message.answer("Який голос потрібен?\n", reply_markup=KB_VOICE)
+    await call.message.answer("Який голос потрібен?\n\n", reply_markup=KB_VOICE)
     await call.answer()
 
 
@@ -241,7 +240,7 @@ async def msg_story(message: Message, state: FSMContext) -> None:
     await db.update_order(data["order_id"], story=story)
     await state.set_state(OrderForm.confirm_story)
     await message.answer(
-        "Чудово! Натисніть кнопку, щоб створити текст пісні.\n",
+        "Чудово! Натисніть кнопку, щоб створити текст пісні.\n\n",
         reply_markup=KB_GENERATE,
     )
 
@@ -280,7 +279,7 @@ async def cb_edit_lyrics(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer("Правку вже було використано.", show_alert=True)
         return
     await state.set_state(OrderForm.awaiting_edit)
-    await call.message.answer("Що саме хочете змінити в тексті? Напишіть одним повідомленням.")
+    await call.message.answer("Напишіть що змінити — слово, фразу або загальний напрямок. Чим детальніше, тим краще результат ✨")
     await call.answer()
 
 
@@ -291,7 +290,7 @@ async def msg_edit(message: Message, state: FSMContext) -> None:
     if not order or order["edit_used"]:
         await message.answer("Правку вже було використано.")
         return
-    wait_msg = await message.answer("⏳ Вношу правку...")
+    wait_msg = await message.answer("⏳ Вношу правки...")
     try:
         new_lyrics = await gpt.edit_lyrics(order["lyrics"], message.text or "", recipient=order.get("recipient", ""))
     except Exception as e:
@@ -379,7 +378,7 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
     await call.message.answer(
         f"🎵 Ви обрали варіант {variant}.\n\n"
         "Натисніть кнопку нижче, щоб оплатити та отримати\n"
-        "повну версію пісні одразу після оплати.",
+        "повну версію пісні одразу після оплати.\n",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Оплатити повну пісню — 349 грн", url=pay_url)],
             [_manager_btn()],
