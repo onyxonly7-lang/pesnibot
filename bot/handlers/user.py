@@ -436,7 +436,7 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
         return
 
     await db.update_order(order_id, status="paid")
-    await bot.send_audio(order["user_id"], audio=file_id, caption="🎵 Ваша повна версія пісні!")
+    await bot.send_audio(order["user_id"], audio=file_id, title="Ваша пісня", performer="Studio 24")
 
 
 deliver_full_track = _deliver_full_track

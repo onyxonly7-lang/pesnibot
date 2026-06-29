@@ -139,7 +139,8 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
             await bot.send_audio(
                 user_id,
                 audio=audio_input,
-                caption=f"🎵 Варіант {variant_num}",
+                title=f"Варіант {variant_num}",
+                performer="Studio 24",
             )
         except Exception:
             log.exception("Preview error: variant=%s order=%s", variant_num, order_id)
