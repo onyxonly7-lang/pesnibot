@@ -119,7 +119,7 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
             tg_file = await bot.get_file(file_id)
             downloaded = await bot.download_file(tg_file.file_path)
             preview_bytes = await make_preview(downloaded.read())
-            audio_input = BufferedInputFile(preview_bytes, filename=f"preview_{variant_num}.mp3")
+            audio_input = BufferedInputFile(preview_bytes, filename=f"Варіант {variant_num}.mp3")
             await bot.send_audio(
                 user_id,
                 audio=audio_input,

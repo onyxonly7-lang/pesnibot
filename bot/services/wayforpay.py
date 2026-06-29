@@ -1,14 +1,12 @@
 import hashlib
 import hmac
 import time
-import urllib.parse
 from typing import Any
 
-from bot.config import WFP_MERCHANT_ACCOUNT, WFP_MERCHANT_SECRET, WEBHOOK_URL, PRICE_UAH
+from bot.config import WFP_MERCHANT_ACCOUNT, WFP_MERCHANT_SECRET, PRICE_UAH
 
 _WFP_PAY_URL = "https://secure.wayforpay.com/pay"
 
-# Фиксированные URL согласно договорённости
 _BASE_URL = "https://worker-production-2e5c.up.railway.app"
 _SERVICE_URL = _BASE_URL + "/wfp"
 _RETURN_URL = _BASE_URL + "/wfp/return"
@@ -24,13 +22,13 @@ def _sign(params: list) -> str:
     ).hexdigest()
 
 
-def build_payment_url(order_id: str, user_id: int) -> str:
+def build_payment_params(order_id: str) -> dict:
+    """Build WayForPay payment parameters for POST form submission."""
     order_date = int(time.time())
-    product_name = f"Персональная песня {order_id}"
+    product_name = f"Персональна пісня {order_id}"
     product_count = 1
     product_price = PRICE_UAH
 
-    # Порядок полей подписи строго по документации WayForPay
     signature = _sign([
         WFP_MERCHANT_ACCOUNT,
         _DOMAIN,
@@ -43,7 +41,7 @@ def build_payment_url(order_id: str, user_id: int) -> str:
         product_price,
     ])
 
-    params = {
+    return {
         "merchantAccount": WFP_MERCHANT_ACCOUNT,
         "merchantDomainName": _DOMAIN,
         "orderReference": order_id,
@@ -56,15 +54,14 @@ def build_payment_url(order_id: str, user_id: int) -> str:
         "merchantSignature": signature,
         "returnUrl": _RETURN_URL,
         "serviceUrl": _SERVICE_URL,
-        "language": "RU",
+        "language": "UA",
         "paymentSystems": "card;googlePay;applePay",
         "productLogoUrl": "https://i.imgur.com/YVeJq9p.jpeg",
     }
-    return _WFP_PAY_URL + "?" + urllib.parse.urlencode(params)
 
 
 def verify_webhook(data: dict[str, Any]) -> bool:
-    """Проверяет HMAC-MD5 подпись входящего вебхука от WayForPay."""
+    """Verify HMAC-MD5 signature from WayForPay webhook."""
     sign_params = [
         data.get("merchantAccount", ""),
         data.get("orderReference", ""),
@@ -81,7 +78,7 @@ def verify_webhook(data: dict[str, Any]) -> bool:
 
 
 def build_webhook_response(order_id: str, status: str = "accept") -> dict:
-    """Ответ который WayForPay ожидает после обработки вебхука."""
+    """Build the response WayForPay expects after webhook processing."""
     now = int(time.time())
     sign = _sign([order_id, status, now])
     return {

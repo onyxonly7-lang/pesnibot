@@ -17,7 +17,6 @@ from aiogram.types import (
 from bot import db
 from bot.config import ADMIN_CHAT_ID, MANAGER_USERNAME
 from bot.services import gpt
-from bot.services.wayforpay import build_payment_url
 from bot.states import OrderForm
 
 log = logging.getLogger(__name__)
@@ -100,12 +99,6 @@ def _manager_btn() -> InlineKeyboardButton:
     username = MANAGER_USERNAME.lstrip("@")
     return InlineKeyboardButton(text="💬 Написати менеджеру", url=f"https://t.me/{username}")
 
-
-def kb_after_choose(order_id: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎵 Отримати повну пісню — 349 грн", callback_data=f"pay:{order_id}")],
-        [_manager_btn()],
-    ])
 
 
 def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
@@ -377,31 +370,19 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         order = await db.get_latest_order_for_user(call.from_user.id)
         if order:
             order_id = order["id"]
-    await db.update_order(order_id, chosen_variant=variant, status="chosen")
-    await call.message.answer(
-        f"Ви обрали варіант {variant}.\n"
-        "Повна версія пісні буде доступна після оплати.\n",
-        reply_markup=kb_after_choose(order_id),
-    )
-    await call.answer()
-
-
-@router.callback_query(F.data.startswith("pay:"))
-async def cb_pay(call: CallbackQuery) -> None:
-    order_id = call.data.split(":", 1)[1]
     order = await db.get_order(order_id)
-    if not order:
-        await call.answer("Замовлення не знайдено.", show_alert=True)
-        return
-    if order["status"] == "paid":
+    if order and order["status"] == "paid":
         await call.answer("Це замовлення вже оплачено.", show_alert=True)
         return
-    url = build_payment_url(order_id, call.from_user.id)
+    await db.update_order(order_id, chosen_variant=variant, status="chosen")
+    pay_url = f"https://worker-production-2e5c.up.railway.app/pay/{order_id}"
     await call.message.answer(
-        "Повна версія пісні — 349 грн.\n"
-        "Після оплати бот одразу надішле вам повний трек.\n",
+        f"🎵 Ви обрали варіант {variant}.\n\n"
+        "Натисніть кнопку нижче, щоб оплатити та отримати\n"
+        "повну версію пісні одразу після оплати.",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатити 349 грн", url=url)],
+            [InlineKeyboardButton(text="💳 Оплатити повну пісню — 349 грн", url=pay_url)],
+            [_manager_btn()],
         ]),
     )
     await call.answer()
