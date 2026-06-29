@@ -14,6 +14,7 @@ from aiogram.types import (
 from bot import db
 from bot.config import ADMIN_CHAT_ID, MANAGER_USERNAME
 from bot.services import gpt
+from bot.services.wayforpay import build_payment_url
 from bot.states import OrderForm
 
 log = logging.getLogger(__name__)
@@ -377,7 +378,7 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer("Це замовлення вже оплачено.", show_alert=True)
         return
     await db.update_order(order_id, chosen_variant=variant, status="chosen")
-    pay_url = f"https://worker-production-2e5c.up.railway.app/pay/{order_id}"
+    pay_url = build_payment_url(order_id)
     await call.message.answer(
         f"🎵 Ви обрали варіант {variant}.\n\n"
         "Натисніть кнопку нижче, щоб оплатити та отримати\n"

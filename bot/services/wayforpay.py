@@ -22,6 +22,13 @@ def _sign(params: list) -> str:
     ).hexdigest()
 
 
+def build_payment_url(order_id: str) -> str:
+    """Build a direct GET URL to WayForPay payment page."""
+    import urllib.parse
+    params = build_payment_params(order_id)
+    return _WFP_PAY_URL + "?" + urllib.parse.urlencode(params)
+
+
 def build_payment_params(order_id: str) -> dict:
     """Build WayForPay payment parameters for POST form submission."""
     order_date = int(time.time())
