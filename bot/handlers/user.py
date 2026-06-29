@@ -92,8 +92,7 @@ def kb_lyrics(can_edit: bool) -> InlineKeyboardMarkup:
 
 
 def _manager_btn() -> InlineKeyboardButton:
-    username = MANAGER_USERNAME.lstrip("@")
-    return InlineKeyboardButton(text="💬 Написати менеджеру", url=f"https://t.me/{username}")
+    return InlineKeyboardButton(text="💬 Написати менеджеру", url="https://t.me/Studio24pro")
 
 
 
