@@ -11,3 +11,7 @@ class OrderForm(StatesGroup):
     preview_requested = State()
 
 
+class UploadExamples(StatesGroup):
+    collecting = State()
+
+

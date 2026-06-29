@@ -1,14 +1,11 @@
 import asyncio
 import logging
-from pathlib import Path
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
-    BufferedInputFile,
     CallbackQuery,
-    FSInputFile,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
     Message,
@@ -22,7 +19,6 @@ from bot.states import OrderForm
 log = logging.getLogger(__name__)
 router = Router()
 
-ASSETS = Path(__file__).parent.parent.parent / "assets"
 
 _SEPARATOR = "➖➖➖➖➖➖➖➖➖➖"
 
@@ -152,17 +148,20 @@ async def cb_examples(call: CallbackQuery, bot: Bot) -> None:
     await call.answer()
     uid = call.from_user.id
     examples = [
-        ("example_mom.mp3", "🎵 Пісня для мами"),
-        ("example_beloved_female.mp3", "💕 Пісня для коханої"),
-        ("example_beloved_male.mp3", "🎸 Пісня для коханого"),
+        ("EXAMPLE_SONG_WIFE",    "🎵 Пісня для дружини"),
+        ("EXAMPLE_SONG_HUSBAND", "🎵 Пісня для чоловіка"),
+        ("EXAMPLE_SONG_FRIEND",  "🎵 Пісня для подруги"),
+        ("EXAMPLE_SONG_MOM",     "🎵 Пісня для мами"),
     ]
-    for filename, caption in examples:
-        path = ASSETS / filename
-        if path.exists():
-            await bot.send_audio(uid, audio=FSInputFile(str(path)), caption=caption)
-        else:
-            await bot.send_message(uid, f"{caption} — поки не завантажена.")
-    await bot.send_message(uid, "Хочете створити свою?\n", reply_markup=KB_AFTER_EXAMPLES)
+    any_sent = False
+    for key, caption in examples:
+        file_id = await db.get_setting(key)
+        if file_id:
+            await bot.send_audio(uid, audio=file_id, caption=caption)
+            any_sent = True
+    if not any_sent:
+        await bot.send_message(uid, "Приклади поки не завантажені. Зверніться до менеджера.")
+    await bot.send_message(uid, "Хочете створити свою?\n\n", reply_markup=KB_AFTER_EXAMPLES)
 
 
 # ── order flow ────────────────────────────────────────────────────────────

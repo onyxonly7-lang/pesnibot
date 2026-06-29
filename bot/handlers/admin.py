@@ -2,14 +2,30 @@ import logging
 import re
 
 from aiogram import Bot, F, Router
+from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
 from bot import db
 from bot.config import ADMIN_CHAT_ID
 from bot.services.audio import make_preview
+from bot.states import UploadExamples
 
 log = logging.getLogger(__name__)
 router = Router()
+
+_EXAMPLE_KEYS = [
+    "EXAMPLE_SONG_WIFE",
+    "EXAMPLE_SONG_HUSBAND",
+    "EXAMPLE_SONG_FRIEND",
+    "EXAMPLE_SONG_MOM",
+]
+_EXAMPLE_LABELS = [
+    "дружини",
+    "чоловіка",
+    "подруги",
+    "мами",
+]
 
 
 def _is_admin(user_id: int) -> bool:
@@ -141,3 +157,47 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
     )
 
     await db.update_order(order_id, status="chosen" if all_ok else "previewing")
+
+
+# ── /upload_examples ──────────────────────────────────────────────────────
+
+@router.message(Command("upload_examples"))
+async def cmd_upload_examples(message: Message, state: FSMContext) -> None:
+    if not _is_admin(message.from_user.id):
+        return
+    await state.set_state(UploadExamples.collecting)
+    await state.update_data(example_index=0, example_file_ids=[])
+    await message.answer(
+        "📤 Режим завантаження прикладів.\n\n"
+        "Надішліть 4 аудіофайли по черзі:\n"
+        "1️⃣ Пісня для дружини\n"
+        "2️⃣ Пісня для чоловіка\n"
+        "3️⃣ Пісня для подруги\n"
+        "4️⃣ Пісня для мами\n\n"
+        "Надішліть перший файл ⬇️"
+    )
+
+
+@router.message(UploadExamples.collecting, F.audio | F.document)
+async def handle_example_audio(message: Message, state: FSMContext) -> None:
+    if not _is_admin(message.from_user.id):
+        return
+
+    data = await state.get_data()
+    index: int = data.get("example_index", 0)
+    file_ids: list = data.get("example_file_ids", [])
+
+    audio = message.audio or message.document
+    file_ids.append(audio.file_id)
+    index += 1
+    await state.update_data(example_index=index, example_file_ids=file_ids)
+
+    if index < len(_EXAMPLE_KEYS):
+        label = _EXAMPLE_LABELS[index]
+        await message.answer(f"✅ Збережено. Надішліть файл {index + 1}️⃣ — пісня для {label}:")
+    else:
+        # All 4 received — save to DB
+        for key, file_id in zip(_EXAMPLE_KEYS, file_ids):
+            await db.set_setting(key, file_id)
+        await state.clear()
+        await message.answer("✅ Всі приклади завантажено успішно!")

@@ -9,6 +9,12 @@ DB_PATH = os.getenv("DB_PATH", "orders.db")
 async def init_db() -> None:
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            )
+        """)
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS orders (
                 id TEXT PRIMARY KEY,
                 user_id INTEGER,
@@ -92,3 +98,20 @@ async def get_latest_order_for_user(user_id: int) -> dict | None:
         ) as cur:
             row = await cur.fetchone()
             return dict(row) if row else None
+
+
+async def get_setting(key: str) -> str | None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute("SELECT value FROM settings WHERE key=?", (key,)) as cur:
+            row = await cur.fetchone()
+            return row[0] if row else None
+
+
+async def set_setting(key: str, value: str) -> None:
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            "INSERT INTO settings (key, value) VALUES (?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+            (key, value),
+        )
+        await db.commit()
