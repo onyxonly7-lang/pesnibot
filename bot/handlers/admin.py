@@ -2,7 +2,7 @@ import logging
 import re
 
 from aiogram import Bot, F, Router
-from aiogram.filters import Command
+from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
@@ -50,9 +50,9 @@ def _detect_variant(filename: str) -> int | None:
     return None
 
 
-# ── Incoming audio from admin (any state) ─────────────────────────────────
+# ── Incoming audio from admin (only outside UploadExamples state) ─────────
 
-@router.message(F.audio | F.document)
+@router.message(~StateFilter(UploadExamples.collecting), F.audio | F.document)
 async def handle_admin_audio(message: Message, bot: Bot) -> None:
     if not _is_admin(message.from_user.id):
         return
@@ -188,16 +188,22 @@ async def handle_example_audio(message: Message, state: FSMContext) -> None:
     file_ids: list = data.get("example_file_ids", [])
 
     audio = message.audio or message.document
+    current_label = _EXAMPLE_LABELS[index]
     file_ids.append(audio.file_id)
     index += 1
     await state.update_data(example_index=index, example_file_ids=file_ids)
 
     if index < len(_EXAMPLE_KEYS):
-        label = _EXAMPLE_LABELS[index]
-        await message.answer(f"✅ Збережено. Надішліть файл {index + 1}️⃣ — пісня для {label}:")
+        next_label = _EXAMPLE_LABELS[index]
+        await message.answer(
+            f"✅ Пісня для {current_label} збережена.\n\n"
+            f"Надішліть наступний файл — пісня для {next_label}:"
+        )
     else:
-        # All 4 received — save to DB
         for key, file_id in zip(_EXAMPLE_KEYS, file_ids):
             await db.set_setting(key, file_id)
         await state.clear()
-        await message.answer("✅ Всі приклади завантажено успішно!")
+        await message.answer(
+            f"✅ Пісня для {current_label} збережена.\n\n"
+            "✅ Всі приклади завантажено успішно!"
+        )
