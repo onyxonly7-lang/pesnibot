@@ -1,9 +1,13 @@
 import hashlib
 import hmac
+import logging
 import time
+import urllib.parse
 from typing import Any
 
 from bot.config import WFP_MERCHANT_ACCOUNT, WFP_MERCHANT_SECRET, PRICE_UAH
+
+log = logging.getLogger(__name__)
 
 _WFP_PAY_URL = "https://secure.wayforpay.com/pay"
 
@@ -15,6 +19,7 @@ _DOMAIN = "worker-production-2e5c.up.railway.app"
 
 def _sign(params: list) -> str:
     msg = ";".join(str(p) for p in params)
+    log.info("WFP sign string: %s", msg)
     return hmac.new(
         WFP_MERCHANT_SECRET.encode(),
         msg.encode(),
@@ -24,18 +29,19 @@ def _sign(params: list) -> str:
 
 def build_payment_url(order_id: str) -> str:
     """Build a direct GET URL to WayForPay payment page."""
-    import urllib.parse
     params = build_payment_params(order_id)
-    return _WFP_PAY_URL + "?" + urllib.parse.urlencode(params)
+    url = _WFP_PAY_URL + "?" + urllib.parse.urlencode(params)
+    log.info("WFP payment URL: %s", url)
+    return url
 
 
 def build_payment_params(order_id: str) -> dict:
-    """Build WayForPay payment parameters for POST form submission."""
     order_date = int(time.time())
     product_name = f"Персональна пісня {order_id}"
     product_count = 1
     product_price = PRICE_UAH
 
+    # Signature uses plain strings; keys in URL must match (no [] suffix)
     signature = _sign([
         WFP_MERCHANT_ACCOUNT,
         _DOMAIN,

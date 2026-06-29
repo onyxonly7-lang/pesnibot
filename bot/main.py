@@ -9,7 +9,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from bot.config import BOT_TOKEN, WEBHOOK_URL
 from bot import db
 from bot.handlers import user, admin
-from bot.handlers.payment import wfp_webhook, wfp_return
+from bot.handlers.payment import wfp_webhook, wfp_return, test_payment
 from bot.handlers.stats import router as stats_router, run_daily_stats
 
 logging.basicConfig(
@@ -37,6 +37,7 @@ async def main() -> None:
     app["bot"] = bot
     app.router.add_post(WFP_PATH, wfp_webhook)
     app.router.add_get(WFP_RETURN_PATH, wfp_return)
+    app.router.add_get("/test_payment", test_payment)
     app.router.add_post(WEBHOOK_PATH, _make_tg_webhook_handler(bot, dp))
 
     webhook_url = WEBHOOK_URL.rstrip("/") + WEBHOOK_PATH

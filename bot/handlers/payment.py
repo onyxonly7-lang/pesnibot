@@ -5,7 +5,7 @@ from aiohttp import web
 from aiogram import Bot
 
 from bot import db
-from bot.services.wayforpay import verify_webhook, build_webhook_response
+from bot.services.wayforpay import verify_webhook, build_webhook_response, build_payment_url
 from bot.handlers.user import deliver_full_track
 
 log = logging.getLogger(__name__)
@@ -39,3 +39,9 @@ async def wfp_return(request: web.Request) -> web.Response:
         content_type="text/html",
         text="<h2>Дякуємо! Ваш платіж обробляється. Поверніться до Telegram.</h2>",
     )
+
+
+async def test_payment(request: web.Request) -> web.Response:
+    order_id = request.rel_url.query.get("order_id", "TEST-001")
+    url = build_payment_url(order_id)
+    return web.Response(content_type="text/plain", text=url)
