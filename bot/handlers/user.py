@@ -108,11 +108,7 @@ def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
 
 async def _send_start(message: Message, state: FSMContext) -> None:
     await state.clear()
-    await message.answer(
-        "Спочатку ви отримаєте безкоштовне музичне превью,\n"
-        "оплачуйте лише якщо пісня сподобається 🎁\n",
-        reply_markup=KB_START,
-    )
+    await message.answer("​", reply_markup=KB_START)
 
 
 @router.message(Command("start"))
