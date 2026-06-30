@@ -17,6 +17,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger(__name__)
+log.info("=== BOT STARTING — build v2 ===")  # version marker for Railway build cache
 
 WFP_PATH = "/wfp"
 WFP_RETURN_PATH = "/wfp/return"
