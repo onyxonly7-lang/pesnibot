@@ -6,8 +6,6 @@ class OrderForm(StatesGroup):
     occasion = State()
     voice = State()
     story = State()
-    confirm_story = State()
-    awaiting_edit = State()
     preview_requested = State()
 
 

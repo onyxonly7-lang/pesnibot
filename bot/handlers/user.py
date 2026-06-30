@@ -21,23 +21,6 @@ log = logging.getLogger(__name__)
 router = Router()
 
 
-_SEPARATOR = "➖➖➖➖➖➖➖➖➖➖"
-
-
-def _is_ukrainian(text: str) -> bool:
-    ua_chars = set("іїєґІЇЄҐ")
-    return bool(ua_chars.intersection(text))
-
-
-def _after_lyrics_text(lyrics: str) -> str:
-    return (
-        f"\n\n\n{_SEPARATOR}\n\n"
-        "🎵 Це лише текст — у музиці та голосі\n"
-        "пісня розкриється зовсім інакше.\n\n"
-        "Ви можете внести правки або одразу створити музичне превью.\n"
-    )
-
-
 # ── keyboard helper ────────────────────────────────────────────────────────
 
 def _kb(*buttons: tuple[str, str]) -> InlineKeyboardMarkup:
@@ -80,20 +63,9 @@ KB_VOICE = _kb(
     ("Чоловічий + жіночий", "v:Чоловічий + жіночий"),
 )
 
-KB_GENERATE = _kb(("📝 Створити текст пісні", "generate_lyrics"))
-
-
-def kb_lyrics(can_edit: bool) -> InlineKeyboardMarkup:
-    buttons = []
-    if can_edit:
-        buttons.append(("✏️ Внести правки", "edit_lyrics"))
-    buttons.append(("🎵 Створити музичне превью", "request_preview"))
-    return _kb(*buttons)
-
 
 def _manager_btn() -> InlineKeyboardButton:
     return InlineKeyboardButton(text="💬 Написати менеджеру", url="https://t.me/Studio24pro")
-
 
 
 def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
@@ -102,6 +74,38 @@ def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🏦 Банківський переказ", callback_data=f"bank:{order_id}")],
         [_manager_btn()],
     ])
+
+
+# ── progress animation ────────────────────────────────────────────────────
+
+_PROGRESS_STEPS = [
+    (27, "📖 Аналізуємо вашу історію…\nШукаємо найважливіші моменти, щоб пісня була саме про вас.\n⏳"),
+    (35, "✍️ Створюємо текст пісні…\nПеретворюємо ваші спогади на рядки, які легко лягають на музику.\n⏳"),
+    (35, "🎼 Підбираємо мелодію та настрій…\nВаша історія може звучати зовсім по-різному, тому ми підбираємо найкращий варіант.\n⏳"),
+    (35, "🎤 Створюємо вокал…\nНамагаємося, щоб голос і подача максимально передавали емоції вашої історії.\n⏳"),
+    (35, "✨ Майже готово…\nПеревіряємо фінальний результат і готуємо два музичні варіанти для прослуховування.\n⏳"),
+]
+
+
+async def _run_progress(chat_id: int, bot: Bot, done_event: asyncio.Event) -> None:
+    """Edit a single message through progress steps, stopping early if done_event is set."""
+    msg = await bot.send_message(
+        chat_id,
+        "🎵 Починаємо створення вашої пісні.\n"
+        "Це займе приблизно 5–10 хвилин. Ми повідомимо, щойно все буде готово.\n⏳",
+    )
+    for delay, text in _PROGRESS_STEPS:
+        try:
+            await asyncio.wait_for(done_event.wait(), timeout=delay)
+            break  # generation finished early — stop updating
+        except asyncio.TimeoutError:
+            pass
+        if done_event.is_set():
+            break
+        try:
+            await bot.edit_message_text(text, chat_id=chat_id, message_id=msg.message_id)
+        except Exception:
+            pass
 
 
 # ── /start ────────────────────────────────────────────────────────────────
@@ -172,18 +176,6 @@ def _kb_limit_reached() -> InlineKeyboardMarkup:
 
 @router.callback_query(F.data == "start_order")
 async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
-    # TODO: re-enable after testing
-    # is_admin = call.from_user.id == ADMIN_CHAT_ID
-    # if not is_admin:
-    #     count = await db.count_orders_last_24h(call.from_user.id)
-    #     if count >= 2:
-    #         await call.message.answer(
-    #             "Ви вже створили 2 пісні сьогодні.\n"
-    #             "Спробуйте завтра або напишіть менеджеру.\n",
-    #             reply_markup=_kb_limit_reached(),
-    #         )
-    #         await call.answer()
-    #         return
     await state.clear()
     order_id = await db.create_order(call.from_user.id, call.from_user.username or "")
     await state.update_data(order_id=order_id)
@@ -235,125 +227,60 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.message(OrderForm.story)
-async def msg_story(message: Message, state: FSMContext) -> None:
+async def msg_story(message: Message, state: FSMContext, bot: Bot) -> None:
     story = message.text or ""
     await state.update_data(story=story)
     data = await state.get_data()
-    await db.update_order(data["order_id"], story=story)
-    await state.set_state(OrderForm.confirm_story)
-    await message.answer(
-        "Чудово! Натисніть кнопку, щоб створити текст пісні.\n\n",
-        reply_markup=KB_GENERATE,
-    )
-
-
-@router.callback_query(F.data == "generate_lyrics", OrderForm.confirm_story)
-async def cb_generate_lyrics(call: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    await call.answer()
-    wait_msg = await call.message.answer("⏳ Аналізуємо вашу історію...")
-    try:
-        lyrics = await gpt.generate_lyrics(
-            data["recipient"], data["occasion"], data["voice"], data["story"]
-        )
-    except Exception as e:
-        log.exception("GPT error")
-        await wait_msg.delete()
-        await call.message.answer(f"Помилка генерації тексту: {e}")
-        return
-    await db.update_order(data["order_id"], lyrics=lyrics)
-    await state.update_data(lyrics=lyrics)
-    await wait_msg.delete()
-    await call.message.answer(
-        f"Ваш текст пісні готовий.\n\n{lyrics}" + _after_lyrics_text(lyrics),
-        reply_markup=kb_lyrics(can_edit=True),
-    )
-
-
-@router.callback_query(F.data == "edit_lyrics")
-async def cb_edit_lyrics(call: CallbackQuery, state: FSMContext) -> None:
-    data = await state.get_data()
-    order = await db.get_order(data.get("order_id", ""))
-    if not order:
-        await call.answer("Замовлення не знайдено.", show_alert=True)
-        return
-    if order["edit_used"]:
-        await call.answer("Правку вже було використано.", show_alert=True)
-        return
-    await state.set_state(OrderForm.awaiting_edit)
-    await call.message.answer("Напишіть що змінити — слово, фразу або загальний напрямок. Чим детальніше, тим кращий результат.")
-    await call.answer()
-
-
-@router.message(OrderForm.awaiting_edit)
-async def msg_edit(message: Message, state: FSMContext) -> None:
-    data = await state.get_data()
-    order = await db.get_order(data.get("order_id", ""))
-    if not order or order["edit_used"]:
-        await message.answer("Правку вже було використано.")
-        return
-    wait_msg = await message.answer("⏳ Вношу правки...")
-    try:
-        new_lyrics = await gpt.edit_lyrics(order["lyrics"], message.text or "", recipient=order.get("recipient", ""))
-    except Exception as e:
-        log.exception("GPT edit error")
-        await wait_msg.delete()
-        await message.answer(f"Помилка: {e}")
-        return
-    await db.update_order(order["id"], lyrics=new_lyrics, edit_used=1)
-    await state.update_data(lyrics=new_lyrics)
-    await state.set_state(OrderForm.confirm_story)
-    await wait_msg.delete()
-    await message.answer(
-        f"Ваш оновлений текст пісні:\n\n{new_lyrics}" + _after_lyrics_text(new_lyrics),
-        reply_markup=kb_lyrics(can_edit=False),
-    )
-
-
-@router.callback_query(F.data == "request_preview")
-async def cb_request_preview(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    data = await state.get_data()
-    order_id = data.get("order_id", "")
-    order = await db.get_order(order_id)
-    if not order:
-        await call.answer("Замовлення не знайдено.", show_alert=True)
-        return
-
-    await db.update_order(order_id, status="preview_sent")
+    order_id = data["order_id"]
+    await db.update_order(order_id, story=story)
     await state.set_state(OrderForm.preview_requested)
-    await call.answer()
 
-    await call.message.answer(
-        "🎧 Ми створюємо для вас музичне превью.\n"
-        "Зазвичай превью готове протягом 10–15 хвилин."
-    )
+    done_event = asyncio.Event()
 
-    progress = [
-        "✅ Аналізуємо історію",
-        "✅ Підбираємо настрій пісні",
-        "✅ Створюємо музику",
-        "⏳ Готуємо превью...",
-    ]
-    for step in progress:
-        await asyncio.sleep(20)
-        await call.message.answer(step)
+    async def _generate() -> None:
+        try:
+            lyrics = await gpt.generate_lyrics(
+                data["recipient"], data["occasion"], data["voice"], story
+            )
+        except Exception:
+            log.exception("GPT error for order %s", order_id)
+            await bot.send_message(
+                message.from_user.id,
+                "⚠️ Виникла помилка під час генерації тексту. Спробуйте ще раз або зверніться до менеджера.",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
+            )
+            return
+        finally:
+            done_event.set()
 
-    admin_text = (
-        f"🎵 Нове замовлення на музичне превью\n\n"
-        f"Замовлення: {order_id}\n"
-        f"Telegram: @{order['username']} / {order['user_id']}\n"
-        f"Кому: {order['recipient']}\n"
-        f"Привід: {order['occasion']}\n"
-        f"Голос: {order['voice']}\n\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"📝 Текст пісні:\n"
-        f"{order['lyrics']}\n"
-        f"━━━━━━━━━━━━━━━"
-    )
-    await bot.send_message(ADMIN_CHAT_ID, admin_text)
-    await bot.send_message(
-        ADMIN_CHAT_ID,
-        "Завантажте 2 аудіофайли"
+        await db.update_order(order_id, lyrics=lyrics, status="preview_sent")
+
+        order = await db.get_order(order_id)
+        admin_text = (
+            f"🎵 Нове замовлення на музичне превью\n\n"
+            f"Замовлення: {order_id}\n"
+            f"Telegram: @{order['username']} / {order['user_id']}\n"
+            f"Кому: {order['recipient']}\n"
+            f"Привід: {order['occasion']}\n"
+            f"Голос: {order['voice']}\n\n"
+            f"━━━━━━━━━━━━━━━\n"
+            f"📝 Текст пісні:\n"
+            f"{lyrics}\n"
+            f"━━━━━━━━━━━━━━━"
+        )
+        await bot.send_message(ADMIN_CHAT_ID, admin_text)
+        await bot.send_message(ADMIN_CHAT_ID, "Завантажте 2 аудіофайли")
+
+        await bot.send_message(
+            message.from_user.id,
+            "🎧 Ми створюємо для вас музичне превью.\n"
+            "Зазвичай превью готове протягом 10–15 хвилин.\n"
+            "Ми надішлемо його сюди, щойно воно буде готове.",
+        )
+
+    await asyncio.gather(
+        _run_progress(message.from_user.id, bot, done_event),
+        _generate(),
     )
 
 
@@ -385,9 +312,11 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         )
         return
     await call.message.answer(
-        f"🎵 Ви обрали варіант {variant}.\n\n"
-        "Натисніть кнопку нижче, щоб оплатити та отримати\n"
-        "повну версію пісні одразу після оплати.\n",
+        "❤️ Чудовий вибір!\n"
+        "Ваша пісня вже повністю готова.\n"
+        "У безкоштовному прев'ю ви почули лише її частину.\n"
+        "Щоб отримати повну версію без обмежень, натисніть кнопку нижче\n"
+        "👇",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Оплатити пісню — 349 грн", url=pay_url)],
             [_manager_btn()],
