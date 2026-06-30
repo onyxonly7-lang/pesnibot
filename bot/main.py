@@ -29,6 +29,7 @@ def _build_app(bot: Bot, dp: Dispatcher) -> web.Application:
     app["bot"] = bot
     app.router.add_post(WFP_PATH, wfp_webhook)
     app.router.add_get(WFP_RETURN_PATH, wfp_return)
+    app.router.add_post(WFP_RETURN_PATH, wfp_return)  # WayForPay returns via POST
     app.router.add_get("/test_payment", test_payment)
     app.router.add_post(WEBHOOK_PATH, _make_tg_webhook_handler(bot, dp))
     return app

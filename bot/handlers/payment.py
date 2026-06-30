@@ -36,6 +36,8 @@ async def wfp_webhook(request: web.Request) -> web.Response:
 
 
 async def wfp_return(request: web.Request) -> web.Response:
+    # WayForPay returns the customer here via POST (sometimes GET).
+    # No logic — delivery happens only in the webhook (/wfp).
     return web.Response(
         content_type="text/html",
         text=(
@@ -44,7 +46,7 @@ async def wfp_return(request: web.Request) -> web.Response:
             "<title>Оплата успішна</title></head>"
             "<body style='font-family:sans-serif;text-align:center;padding:60px 20px'>"
             "<h2>✅ Оплата успішна!</h2>"
-            "<p>Поверніться до Telegram — ваша пісня вже надіслана в чат.</p>"
+            "<p>Поверніться в Telegram — ваша пісня вже чекає на вас 🎵</p>"
             "</body></html>"
         ),
     )

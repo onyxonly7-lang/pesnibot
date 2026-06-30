@@ -375,7 +375,7 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
 
     await bot.send_message(
         uid,
-        "🎉 Дякуємо за довіру!\nВаша повна версія пісні готова — тримайте 🎵",
+        "🎉 Дякуємо за довіру!\nВаша повна версія пісні готова 🎵",
     )
 
     if chosen:
@@ -397,7 +397,7 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
     await bot.send_message(
         uid,
         "Бажаєте створити ще одну пісню?",
-        reply_markup=_kb(("🎵 Створити нову пісню", "start_order")),
+        reply_markup=_kb(("🎵 Створити ще одну пісню", "start_order")),
     )
 
 
