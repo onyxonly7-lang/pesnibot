@@ -87,21 +87,15 @@ _PROGRESS_STEPS = [
 ]
 
 
-async def _run_progress(chat_id: int, bot: Bot, done_event: asyncio.Event) -> None:
-    """Edit a single message through progress steps, stopping early if done_event is set."""
+async def _run_progress(chat_id: int, bot: Bot) -> None:
+    """Show all progress steps unconditionally — animation is independent of GPT timing."""
     msg = await bot.send_message(
         chat_id,
         "🎵 Починаємо створення вашої пісні.\n"
         "Це займе приблизно 5–10 хвилин. Ми повідомимо, щойно все буде готово.\n⏳",
     )
     for delay, text in _PROGRESS_STEPS:
-        try:
-            await asyncio.wait_for(done_event.wait(), timeout=delay)
-            break  # generation finished early — stop updating
-        except asyncio.TimeoutError:
-            pass
-        if done_event.is_set():
-            break
+        await asyncio.sleep(delay)
         try:
             await bot.edit_message_text(text, chat_id=chat_id, message_id=msg.message_id)
         except Exception:
@@ -235,26 +229,18 @@ async def msg_story(message: Message, state: FSMContext, bot: Bot) -> None:
     await db.update_order(order_id, story=story)
     await state.set_state(OrderForm.preview_requested)
 
-    done_event = asyncio.Event()
+    gpt_error: list[Exception] = []
 
     async def _generate() -> None:
         try:
             lyrics = await gpt.generate_lyrics(
                 data["recipient"], data["occasion"], data["voice"], story
             )
-        except Exception:
+        except Exception as e:
             log.exception("GPT error for order %s", order_id)
-            await bot.send_message(
-                message.from_user.id,
-                "⚠️ Виникла помилка під час генерації тексту. Спробуйте ще раз або зверніться до менеджера.",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
-            )
+            gpt_error.append(e)
             return
-        finally:
-            done_event.set()
-
         await db.update_order(order_id, lyrics=lyrics, status="preview_sent")
-
         order = await db.get_order(order_id)
         admin_text = (
             f"🎵 Нове замовлення на музичне превью\n\n"
@@ -271,17 +257,25 @@ async def msg_story(message: Message, state: FSMContext, bot: Bot) -> None:
         await bot.send_message(ADMIN_CHAT_ID, admin_text)
         await bot.send_message(ADMIN_CHAT_ID, "Завантажте 2 аудіофайли")
 
+    # Animation and GPT run in parallel; animation always plays all steps
+    await asyncio.gather(
+        _run_progress(message.from_user.id, bot),
+        _generate(),
+    )
+
+    if gpt_error:
+        await bot.send_message(
+            message.from_user.id,
+            "⚠️ Виникла помилка під час генерації тексту. Спробуйте ще раз або зверніться до менеджера.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
+        )
+    else:
         await bot.send_message(
             message.from_user.id,
             "🎧 Ми створюємо для вас музичне превью.\n"
             "Зазвичай превью готове протягом 10–15 хвилин.\n"
             "Ми надішлемо його сюди, щойно воно буде готове.",
         )
-
-    await asyncio.gather(
-        _run_progress(message.from_user.id, bot, done_event),
-        _generate(),
-    )
 
 
 # ── variant selection & payment ───────────────────────────────────────────
