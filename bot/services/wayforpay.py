@@ -84,13 +84,13 @@ async def create_invoice(order_id: str) -> str:
                 order_id, http_status, raw_text,
             )
 
-    reason_code = data.get("reasonCode", "")
+    reason = data.get("reason", "")
     invoice_url = data.get("invoiceUrl", "")
 
-    if reason_code != "Ok" or not invoice_url:
+    if reason != "Ok" or not invoice_url:
         raise RuntimeError(
             f"WayForPay CREATE_INVOICE failed for {order_id}: "
-            f"reasonCode={reason_code!r}, invoiceUrl={invoice_url!r}, full_response={data}"
+            f"reason={reason!r}, invoiceUrl={invoice_url!r}, full_response={data}"
         )
 
     return invoice_url
