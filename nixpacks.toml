@@ -2,4 +2,4 @@
 nixPkgs = ["ffmpeg"]
 
 [start]
-cmd = "python bot/main.py"
+cmd = "python3 bot/main.py"
