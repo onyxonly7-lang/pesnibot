@@ -361,15 +361,25 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
     if order["status"] == "paid":
         return
 
-    variant = order["chosen_variant"] or 1
-    file_id = order[f"variant{variant}_file_id"]
-    if not file_id:
-        if reply_to:
-            await reply_to.answer("Файл ще не завантажено.")
-        return
-
     await db.update_order(order_id, status="paid")
-    await bot.send_audio(order["user_id"], audio=file_id, title="Ваша пісня")
+    uid = order["user_id"]
+    chosen = order["chosen_variant"]
+
+    if chosen:
+        file_id = order[f"variant{chosen}_file_id"]
+        if not file_id:
+            if reply_to:
+                await reply_to.answer(f"Файл варіанту {chosen} ще не завантажено.")
+            return
+        await bot.send_audio(uid, audio=file_id, title="Ваша пісня")
+    else:
+        # No variant saved — send both and log for investigation
+        log.warning("Order %s paid but chosen_variant is NULL — sending both variants", order_id)
+        await bot.send_message(uid, "Будь ласка, ось обидва варіанти вашої пісні:")
+        for v in (1, 2):
+            fid = order[f"variant{v}_file_id"]
+            if fid:
+                await bot.send_audio(uid, audio=fid, title=f"Варіант {v}")
 
 
 deliver_full_track = _deliver_full_track
