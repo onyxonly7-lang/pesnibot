@@ -5,7 +5,7 @@ from aiohttp import web
 from aiogram import Bot
 
 from bot import db
-from bot.services.wayforpay import verify_webhook, build_webhook_response, create_invoice
+from bot.services.wayforpay import verify_webhook, build_webhook_response, create_invoice, create_invoice_debug
 from bot.handlers.user import deliver_full_track
 
 log = logging.getLogger(__name__)
@@ -53,7 +53,10 @@ async def wfp_return(request: web.Request) -> web.Response:
 async def test_payment(request: web.Request) -> web.Response:
     order_id = request.rel_url.query.get("order_id", "TEST-001")
     try:
-        url = await create_invoice(order_id)
-        return web.Response(content_type="text/plain", text=url)
+        info = await create_invoice_debug(order_id)
+        return web.Response(
+            content_type="application/json",
+            text=json.dumps(info, ensure_ascii=False, indent=2),
+        )
     except Exception as e:
         return web.Response(status=500, content_type="text/plain", text=str(e))

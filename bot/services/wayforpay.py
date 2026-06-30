@@ -96,6 +96,55 @@ async def create_invoice(order_id: str) -> str:
     return invoice_url
 
 
+async def create_invoice_debug(order_id: str) -> dict:
+    """Return the full raw WayForPay response for debugging."""
+    import json as _json
+    order_date = int(time.time())
+    product_name = f"Персональна пісня {order_id}"
+    product_count = 1
+    product_price = PRICE_UAH
+
+    signature = _sign([
+        WFP_MERCHANT_ACCOUNT, _DOMAIN, order_id, order_date,
+        product_price, "UAH", product_name, product_count, product_price,
+    ])
+
+    payload = {
+        "transactionType": "CREATE_INVOICE",
+        "merchantAccount": WFP_MERCHANT_ACCOUNT,
+        "merchantDomainName": _DOMAIN,
+        "merchantSignature": signature,
+        "apiVersion": 1,
+        "orderReference": order_id,
+        "orderDate": order_date,
+        "amount": product_price,
+        "currency": "UAH",
+        "productName": [product_name],
+        "productCount": [product_count],
+        "productPrice": [product_price],
+        "returnUrl": _RETURN_URL,
+        "serviceUrl": _SERVICE_URL,
+        "language": "UA",
+        "paymentSystems": "card;googlePay;applePay",
+        "productLogoUrl": "https://i.imgur.com/YVeJq9p.jpeg",
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.post(_API_URL, json=payload) as resp:
+            raw_text = await resp.text()
+            try:
+                data = _json.loads(raw_text)
+            except Exception:
+                data = {}
+
+    return {
+        "merchantAccount": WFP_MERCHANT_ACCOUNT,
+        "merchantDomainName": _DOMAIN,
+        "sent_amount": product_price,
+        "raw_response": data,
+    }
+
+
 def verify_webhook(data: dict[str, Any]) -> bool:
     """Verify HMAC-MD5 signature from WayForPay webhook."""
     sign_params = [
