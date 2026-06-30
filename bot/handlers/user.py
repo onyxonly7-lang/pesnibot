@@ -305,8 +305,8 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
     await call.message.answer(
-        "❤️ Чудовий вибір!\n"
-        "Ваша пісня вже повністю готова.\n"
+        "❤️ Чудовий вибір!\n\n"
+        "Ваша пісня вже повністю готова.\n\n"
         "У безкоштовному прев'ю ви почули лише її частину.\n"
         "Щоб отримати повну версію без обмежень, натисніть кнопку нижче\n"
         "👇",
