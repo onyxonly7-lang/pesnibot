@@ -14,7 +14,7 @@ from aiogram.types import (
 from bot import db
 from bot.config import ADMIN_CHAT_ID, MANAGER_USERNAME
 from bot.services import gpt
-from bot.services.wayforpay import build_payment_url
+from bot.services.wayforpay import create_invoice
 from bot.states import OrderForm
 
 log = logging.getLogger(__name__)
@@ -373,7 +373,17 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer("Це замовлення вже оплачено.", show_alert=True)
         return
     await db.update_order(order_id, chosen_variant=variant, status="chosen")
-    pay_url = build_payment_url(order_id)
+    await call.answer()
+    try:
+        pay_url = await create_invoice(order_id)
+    except Exception:
+        log.exception("Failed to create WayForPay invoice for order %s", order_id)
+        await call.message.answer(
+            "⚠️ Не вдалося сформувати посилання на оплату. "
+            "Будь ласка, зверніться до менеджера.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
+        )
+        return
     await call.message.answer(
         f"🎵 Ви обрали варіант {variant}.\n\n"
         "Натисніть кнопку нижче, щоб оплатити та отримати\n"
@@ -383,7 +393,6 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
             [_manager_btn()],
         ]),
     )
-    await call.answer()
 
 
 @router.callback_query(F.data.startswith("bank:"))
