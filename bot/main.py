@@ -57,8 +57,11 @@ async def main() -> None:
     try:
         if WEBHOOK_URL:
             webhook_url = WEBHOOK_URL.rstrip("/") + WEBHOOK_PATH
-            await bot.set_webhook(webhook_url, drop_pending_updates=False)
-            log.info("Webhook set to %s", webhook_url)
+            try:
+                await bot.set_webhook(webhook_url, drop_pending_updates=False)
+                log.info("Webhook set to %s", webhook_url)
+            except Exception:
+                log.exception("Failed to set webhook — HTTP server stays up, bot won't receive TG updates")
             await asyncio.Event().wait()
         else:
             log.info("WEBHOOK_URL not set — starting polling")
