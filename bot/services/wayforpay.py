@@ -67,11 +67,22 @@ async def create_invoice(order_id: str) -> str:
         "productLogoUrl": "https://i.imgur.com/YVeJq9p.jpeg",
     }
 
+    # Log full request (mask secret)
+    safe_payload = {**payload, "merchantSignature": "***"}
+    log.info("WFP CREATE_INVOICE request for %s: %s", order_id, safe_payload)
+
     async with aiohttp.ClientSession() as session:
         async with session.post(_API_URL, json=payload) as resp:
-            data = await resp.json(content_type=None)
-
-    log.info("WFP CREATE_INVOICE response for %s: %s", order_id, data)
+            http_status = resp.status
+            raw_text = await resp.text()
+            try:
+                data = __import__("json").loads(raw_text)
+            except Exception:
+                data = {}
+            log.info(
+                "WFP CREATE_INVOICE response for %s: HTTP %s | body: %s",
+                order_id, http_status, raw_text,
+            )
 
     reason_code = data.get("reasonCode", "")
     invoice_url = data.get("invoiceUrl", "")
