@@ -51,7 +51,8 @@ async def wfp_return(request: web.Request) -> web.Response:
 
 
 async def test_payment(request: web.Request) -> web.Response:
-    order_id = request.rel_url.query.get("order_id", "TEST-001")
+    import time
+    order_id = request.rel_url.query.get("order_id") or f"TEST-{int(time.time())}"
     try:
         info = await create_invoice_debug(order_id)
         return web.Response(
