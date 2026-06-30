@@ -301,6 +301,15 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         return
     await db.update_order(order_id, chosen_variant=variant, status="chosen")
     await call.answer()
+
+    await call.message.answer(
+        "❤️ Чудовий вибір!\n"
+        "Ваша пісня вже повністю готова.\n"
+        "У безкоштовному прев'ю ви почули лише її частину.\n"
+        "Щоб отримати повну версію без обмежень, натисніть кнопку нижче\n"
+        "👇",
+    )
+
     try:
         pay_url = await create_invoice(order_id)
     except Exception:
@@ -311,12 +320,9 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
         )
         return
+
     await call.message.answer(
-        "❤️ Чудовий вибір!\n"
-        "Ваша пісня вже повністю готова.\n"
-        "У безкоштовному прев'ю ви почули лише її частину.\n"
-        "Щоб отримати повну версію без обмежень, натисніть кнопку нижче\n"
-        "👇",
+        "💳 Оплатити пісню:",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Оплатити пісню — 349 грн", url=pay_url)],
             [_manager_btn()],
