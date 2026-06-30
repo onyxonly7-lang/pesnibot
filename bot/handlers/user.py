@@ -88,18 +88,26 @@ _PROGRESS_STEPS = [
 
 
 async def _run_progress(chat_id: int, bot: Bot) -> None:
-    """Show all progress steps unconditionally — animation is independent of GPT timing."""
+    """Show all progress steps; intermediate steps edit one message, last step is a new message."""
     msg = await bot.send_message(
         chat_id,
         "🎵 Починаємо створення вашої пісні.\n"
         "Це займе приблизно 5–10 хвилин. Ми повідомимо, щойно все буде готово.\n⏳",
     )
-    for delay, text in _PROGRESS_STEPS:
+    *intermediate, (last_delay, last_text) = _PROGRESS_STEPS
+    for delay, text in intermediate:
         await asyncio.sleep(delay)
         try:
             await bot.edit_message_text(text, chat_id=chat_id, message_id=msg.message_id)
         except Exception:
             pass
+    # Last step: delete the edited message and send a NEW one so Telegram triggers a notification
+    await asyncio.sleep(last_delay)
+    try:
+        await bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
+    except Exception:
+        pass
+    await bot.send_message(chat_id, last_text)
 
 
 # ── /start ────────────────────────────────────────────────────────────────
