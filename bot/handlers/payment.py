@@ -18,12 +18,13 @@ async def wfp_webhook(request: web.Request) -> web.Response:
     except Exception:
         return web.Response(status=400, text="bad json")
 
-    if not verify_webhook(data):
-        log.warning("WFP signature mismatch: %s", data)
-        return web.Response(status=403, text="invalid signature")
-
     order_id: str = data.get("orderReference", "")
     tx_status: str = data.get("transactionStatus", "")
+    log.info("WFP webhook: order=%s status=%s", order_id, tx_status)
+
+    if not verify_webhook(data):
+        log.warning("WFP signature mismatch for order %s: %s", order_id, data)
+        return web.Response(status=403, text="invalid signature")
 
     if tx_status == "Approved":
         order = await db.get_order(order_id)
@@ -37,7 +38,15 @@ async def wfp_webhook(request: web.Request) -> web.Response:
 async def wfp_return(request: web.Request) -> web.Response:
     return web.Response(
         content_type="text/html",
-        text="<h2>Дякуємо! Ваш платіж обробляється. Поверніться до Telegram.</h2>",
+        text=(
+            "<!doctype html><html><head><meta charset='utf-8'>"
+            "<meta name='viewport' content='width=device-width,initial-scale=1'>"
+            "<title>Оплата успішна</title></head>"
+            "<body style='font-family:sans-serif;text-align:center;padding:60px 20px'>"
+            "<h2>✅ Оплата успішна!</h2>"
+            "<p>Поверніться до Telegram — ваша пісня вже надіслана в чат.</p>"
+            "</body></html>"
+        ),
     )
 
 

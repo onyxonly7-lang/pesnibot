@@ -373,21 +373,32 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
     uid = order["user_id"]
     chosen = order["chosen_variant"]
 
+    await bot.send_message(
+        uid,
+        "🎉 Дякуємо за довіру!\nВаша повна версія пісні готова — тримайте 🎵",
+    )
+
     if chosen:
         file_id = order[f"variant{chosen}_file_id"]
         if not file_id:
+            log.error("Order %s: chosen_variant=%s but file_id is empty", order_id, chosen)
             if reply_to:
                 await reply_to.answer(f"Файл варіанту {chosen} ще не завантажено.")
             return
         await bot.send_audio(uid, audio=file_id, title="Ваша пісня")
     else:
-        # No variant saved — send both and log for investigation
         log.warning("Order %s paid but chosen_variant is NULL — sending both variants", order_id)
         await bot.send_message(uid, "Будь ласка, ось обидва варіанти вашої пісні:")
         for v in (1, 2):
             fid = order[f"variant{v}_file_id"]
             if fid:
                 await bot.send_audio(uid, audio=fid, title=f"Варіант {v}")
+
+    await bot.send_message(
+        uid,
+        "Бажаєте створити ще одну пісню?",
+        reply_markup=_kb(("🎵 Створити нову пісню", "start_order")),
+    )
 
 
 deliver_full_track = _deliver_full_track
