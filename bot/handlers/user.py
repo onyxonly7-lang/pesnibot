@@ -277,13 +277,6 @@ async def msg_story(message: Message, state: FSMContext, bot: Bot) -> None:
             "⚠️ Виникла помилка під час генерації тексту. Спробуйте ще раз або зверніться до менеджера.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
         )
-    else:
-        await bot.send_message(
-            message.from_user.id,
-            "🎧 Ми створюємо для вас музичне превью.\n"
-            "Зазвичай превью готове протягом 10–15 хвилин.\n"
-            "Ми надішлемо його сюди, щойно воно буде готове.",
-        )
 
 
 # ── variant selection & payment ───────────────────────────────────────────
@@ -304,14 +297,6 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(order_id, chosen_variant=variant, status="chosen")
     await call.answer()
 
-    await call.message.answer(
-        "❤️ Чудовий вибір!\n\n"
-        "Ваша пісня вже повністю готова.\n\n"
-        "У безкоштовному прев'ю ви почули лише її частину.\n"
-        "Щоб отримати повну версію без обмежень, натисніть кнопку нижче\n"
-        "👇",
-    )
-
     try:
         pay_url = await create_invoice(order_id)
     except Exception:
@@ -324,7 +309,9 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         return
 
     await call.message.answer(
-        "💳 Оплатити пісню:",
+        "❤️ Чудовий вибір!\n\n"
+        "Ваша пісня вже повністю готова.\n\n"
+        "Щоб отримати повну версію без обмежень, натисніть кнопку оплатити 👇",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Оплатити пісню — 349 грн", url=pay_url)],
             [_manager_btn()],
