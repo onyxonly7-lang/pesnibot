@@ -229,14 +229,44 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
 
 
 @router.message(OrderForm.story)
-async def msg_story(message: Message, state: FSMContext, bot: Bot) -> None:
+async def msg_story(message: Message, state: FSMContext) -> None:
     story = message.text or ""
     await state.update_data(story=story)
     data = await state.get_data()
-    order_id = data["order_id"]
-    await db.update_order(order_id, story=story)
-    await state.set_state(OrderForm.preview_requested)
+    await db.update_order(data["order_id"], story=story)
+    await state.set_state(OrderForm.story_review)
+    await message.answer(
+        "✅ Ми зберегли вашу історію.\n"
+        "Якщо хочете щось додати — просто напишіть ще одним повідомленням. "
+        "Коли будете готові — натисніть кнопку нижче.",
+        reply_markup=_kb(("🚀 Стартуємо!", "start_generation")),
+    )
 
+
+@router.message(OrderForm.story_review)
+async def msg_story_addition(message: Message, state: FSMContext) -> None:
+    addition = message.text or ""
+    data = await state.get_data()
+    story = "\n".join(p for p in (data.get("story", ""), addition) if p).strip()
+    await state.update_data(story=story)
+    await db.update_order(data["order_id"], story=story)
+    await message.answer(
+        "✅ Додано! Готові?",
+        reply_markup=_kb(("🚀 Стартуємо!", "start_generation")),
+    )
+
+
+@router.callback_query(F.data == "start_generation", OrderForm.story_review)
+async def cb_start_generation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
+    await call.answer()
+    await state.set_state(OrderForm.preview_requested)
+    data = await state.get_data()
+    await _run_generation(call.from_user.id, data, bot)
+
+
+async def _run_generation(chat_id: int, data: dict, bot: Bot) -> None:
+    order_id = data["order_id"]
+    story = data.get("story", "")
     gpt_error: list[Exception] = []
 
     async def _generate() -> None:
@@ -267,13 +297,13 @@ async def msg_story(message: Message, state: FSMContext, bot: Bot) -> None:
 
     # Animation and GPT run in parallel; animation always plays all steps
     await asyncio.gather(
-        _run_progress(message.from_user.id, bot),
+        _run_progress(chat_id, bot),
         _generate(),
     )
 
     if gpt_error:
         await bot.send_message(
-            message.from_user.id,
+            chat_id,
             "⚠️ Виникла помилка під час генерації тексту. Спробуйте ще раз або зверніться до менеджера.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
         )
