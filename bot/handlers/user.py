@@ -44,24 +44,48 @@ KB_AFTER_EXAMPLES = _kb(
 
 KB_HOW = _kb(("🎵 Створити пісню", "start_order"))
 
-KB_RECIPIENT = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="Чоловіку",  callback_data="r:Чоловіку"),  InlineKeyboardButton(text="Дружині",  callback_data="r:Дружині")],
-    [InlineKeyboardButton(text="Хлопцю",    callback_data="r:Хлопцю"),    InlineKeyboardButton(text="Дівчині",  callback_data="r:Дівчині")],
-    [InlineKeyboardButton(text="Мамі",      callback_data="r:Мамі"),      InlineKeyboardButton(text="Подрузі",  callback_data="r:Подрузі")],
-    [InlineKeyboardButton(text="Дитині",    callback_data="r:Дитині"),    InlineKeyboardButton(text="Інше",     callback_data="r:Інше")],
-])
+# value → display label with emoji (used both on buttons and in the edited message)
+RECIPIENT_LABELS = {
+    "Чоловіку": "👨 Чоловіку",
+    "Дружині": "👩 Дружині",
+    "Хлопцю": "👦 Хлопцю",
+    "Дівчині": "👧 Дівчині",
+    "Мамі": "👩‍👦 Мамі",
+    "Подрузі": "👯 Подрузі",
+    "Дитині": "👶 Дитині",
+    "Інше": "✨ Інше",
+}
 
-KB_OCCASION = InlineKeyboardMarkup(inline_keyboard=[
-    [InlineKeyboardButton(text="День народження", callback_data="o:День народження"), InlineKeyboardButton(text="Річниця",      callback_data="o:Річниця")],
-    [InlineKeyboardButton(text="Освідчення",      callback_data="o:Освідчення"),      InlineKeyboardButton(text="Подяка",       callback_data="o:Подяка")],
-    [InlineKeyboardButton(text="Вибачення",       callback_data="o:Вибачення"),       InlineKeyboardButton(text="Інший привід", callback_data="o:Інший привід")],
-])
+OCCASION_LABELS = {
+    "День народження": "🎂 День народження",
+    "Річниця": "💍 Річниця",
+    "Освідчення": "💕 Освідчення",
+    "Подяка": "🙏 Подяка",
+    "Вибачення": "🤍 Вибачення",
+    "Інший привід": "🎊 Інший привід",
+}
 
-KB_VOICE = _kb(
-    ("Чоловічий", "v:Чоловічий"),
-    ("Жіночий", "v:Жіночий"),
-    ("Чоловічий + жіночий", "v:Чоловічий + жіночий"),
-)
+VOICE_LABELS = {
+    "Чоловічий": "Чоловічий",
+    "Жіночий": "Жіночий",
+    "Дует": "Дует",
+}
+
+def _grid2(labels: dict[str, str], prefix: str) -> InlineKeyboardMarkup:
+    """2 buttons per row so they fit even on small (~5\") screens."""
+    btns = [InlineKeyboardButton(text=label, callback_data=f"{prefix}:{value}")
+            for value, label in labels.items()]
+    rows = [btns[i:i + 2] for i in range(0, len(btns), 2)]
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+KB_RECIPIENT = _grid2(RECIPIENT_LABELS, "r")
+KB_OCCASION = _grid2(OCCASION_LABELS, "o")
+
+KB_VOICE = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text=label, callback_data=f"v:{value}")]
+    for value, label in VOICE_LABELS.items()
+])
 
 
 def _manager_btn() -> InlineKeyboardButton:
@@ -186,6 +210,14 @@ async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
+async def _collapse_buttons(call: CallbackQuery, question: str, label: str) -> None:
+    """Remove the keyboard and leave only the question + chosen option."""
+    try:
+        await call.message.edit_text(f"{question}: {label}")
+    except Exception:
+        pass
+
+
 @router.callback_query(F.data.startswith("r:"), OrderForm.recipient)
 async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     recipient = call.data.split(":", 1)[1]
@@ -193,6 +225,7 @@ async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], recipient=recipient)
     await state.set_state(OrderForm.occasion)
+    await _collapse_buttons(call, "Для кого пісня?", RECIPIENT_LABELS.get(recipient, recipient))
     await call.message.answer("З якого приводу?\n\n", reply_markup=KB_OCCASION)
     await call.answer()
 
@@ -204,6 +237,7 @@ async def cb_occasion(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], occasion=occasion)
     await state.set_state(OrderForm.voice)
+    await _collapse_buttons(call, "З якого приводу?", OCCASION_LABELS.get(occasion, occasion))
     await call.message.answer("Який голос потрібен?\n\n", reply_markup=KB_VOICE)
     await call.answer()
 
@@ -215,6 +249,7 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
     data = await state.get_data()
     await db.update_order(data["order_id"], voice=voice)
     await state.set_state(OrderForm.story)
+    await _collapse_buttons(call, "Який голос потрібен?", VOICE_LABELS.get(voice, voice))
     await call.message.answer(
         "А тепер найважливіше — саме від цього залежить ваша пісня."
     )
@@ -223,14 +258,25 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
         "ім'я або як ви її/його називаєте, характер, захоплення,\n"
         "ваші теплі або смішні моменти і спогади,\n"
         "важливі фрази та побажання.\n\n"
-        "Пишіть вільно, як відчуваєте 💛"
+        "Пишіть вільно, як відчуваєте 💛\n"
+        "🎙 Або надиктуйте голосове повідомлення — ми все зрозуміємо!"
     )
     await call.answer()
 
 
-@router.message(OrderForm.story)
-async def msg_story(message: Message, state: FSMContext) -> None:
-    story = message.text or ""
+async def _transcribe_message_voice(message: Message, bot: Bot) -> str | None:
+    """Download a voice message and return its Whisper transcription."""
+    from io import BytesIO
+    buf = BytesIO()
+    await bot.download(message.voice, destination=buf)
+    try:
+        return await gpt.transcribe_voice(buf.getvalue())
+    except Exception:
+        log.exception("Whisper transcription failed")
+        return None
+
+
+async def _save_first_story(message: Message, state: FSMContext, story: str) -> None:
     await state.update_data(story=story)
     data = await state.get_data()
     await db.update_order(data["order_id"], story=story)
@@ -243,9 +289,7 @@ async def msg_story(message: Message, state: FSMContext) -> None:
     )
 
 
-@router.message(OrderForm.story_review)
-async def msg_story_addition(message: Message, state: FSMContext) -> None:
-    addition = message.text or ""
+async def _save_addition(message: Message, state: FSMContext, addition: str) -> None:
     data = await state.get_data()
     story = "\n".join(p for p in (data.get("story", ""), addition) if p).strip()
     await state.update_data(story=story)
@@ -254,6 +298,34 @@ async def msg_story_addition(message: Message, state: FSMContext) -> None:
         "✅ Додано! Готові?",
         reply_markup=_kb(("🚀 Стартуємо!", "start_generation")),
     )
+
+
+@router.message(OrderForm.story, F.voice)
+async def msg_story_voice(message: Message, state: FSMContext, bot: Bot) -> None:
+    text = await _transcribe_message_voice(message, bot)
+    if not text:
+        await message.answer("⚠️ Не вдалося розпізнати голосове. Спробуйте ще раз або напишіть текстом.")
+        return
+    await _save_first_story(message, state, text)
+
+
+@router.message(OrderForm.story)
+async def msg_story(message: Message, state: FSMContext) -> None:
+    await _save_first_story(message, state, message.text or "")
+
+
+@router.message(OrderForm.story_review, F.voice)
+async def msg_story_addition_voice(message: Message, state: FSMContext, bot: Bot) -> None:
+    text = await _transcribe_message_voice(message, bot)
+    if not text:
+        await message.answer("⚠️ Не вдалося розпізнати голосове. Спробуйте ще раз або напишіть текстом.")
+        return
+    await _save_addition(message, state, text)
+
+
+@router.message(OrderForm.story_review)
+async def msg_story_addition(message: Message, state: FSMContext) -> None:
+    await _save_addition(message, state, message.text or "")
 
 
 @router.callback_query(F.data == "start_generation", OrderForm.story_review)

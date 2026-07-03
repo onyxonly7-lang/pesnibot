@@ -5,12 +5,14 @@ import shutil
 import subprocess
 import tempfile
 
-from bot.config import PREVIEW_START_MS, PREVIEW_END_MS
+from bot.config import PREVIEW_START_MS, PREVIEW_END_MS, PREVIEW_FADEOUT_SEC
 
 log = logging.getLogger(__name__)
 
 _START_SEC = PREVIEW_START_MS / 1000
 _DURATION_SEC = (PREVIEW_END_MS - PREVIEW_START_MS) / 1000
+_FADEOUT_SEC = PREVIEW_FADEOUT_SEC
+_FADEOUT_START = max(0.0, _DURATION_SEC - _FADEOUT_SEC)
 
 _FFMPEG_PATH: str | None = None
 
@@ -64,6 +66,7 @@ async def make_preview(file_bytes: bytes, suffix: str = ".mp3") -> bytes:
                     "-ss", str(_START_SEC),
                     "-i", tmp_in_path,
                     "-t", str(_DURATION_SEC),
+                    "-af", f"afade=t=out:st={_FADEOUT_START}:d={_FADEOUT_SEC}",
                     "-acodec", "libmp3lame",
                     "-ab", "192k",
                     tmp_out_path,

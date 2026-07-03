@@ -53,6 +53,15 @@ def _trim_to_limit(lyrics: str, max_lines: int = 38) -> str:
     return "\n".join(result_lines)
 
 
+async def transcribe_voice(audio_bytes: bytes, filename: str = "voice.ogg") -> str:
+    """Transcribe a Telegram voice message via OpenAI Whisper."""
+    response = await _client.audio.transcriptions.create(
+        model="whisper-1",
+        file=(filename, audio_bytes),
+    )
+    return (response.text or "").strip()
+
+
 async def generate_lyrics(
     recipient: str,
     occasion: str,
