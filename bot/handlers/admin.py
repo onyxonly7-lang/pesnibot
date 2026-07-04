@@ -4,12 +4,18 @@ import re
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
-from aiogram.types import BufferedInputFile, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    BufferedInputFile,
+    CallbackQuery,
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    Message,
+)
 
 from bot import db
 from bot.config import ADMIN_CHAT_ID
 from bot.services.audio import make_preview
-from bot.states import UploadExamples
+from bot.states import UploadExamples, UploadOrder
 
 log = logging.getLogger(__name__)
 router = Router()
@@ -50,54 +56,79 @@ def _detect_variant(filename: str) -> int | None:
     return None
 
 
-# ── Incoming audio from admin (only outside UploadExamples state) ─────────
+# ── Upload files for a specific order (via inline button) ─────────────────
 
-@router.message(~StateFilter(UploadExamples.collecting), F.audio | F.document)
-async def handle_admin_audio(message: Message, bot: Bot) -> None:
-    if not _is_admin(message.from_user.id):
+@router.callback_query(F.data.startswith("upload:"))
+async def cb_upload_files(call: CallbackQuery, state: FSMContext) -> None:
+    if not _is_admin(call.from_user.id):
+        await call.answer()
+        return
+    order_id = call.data.split(":", 1)[1]
+    order = await db.get_order(order_id)
+    if not order:
+        await call.answer("Замовлення не знайдено.", show_alert=True)
+        return
+    await state.set_state(UploadOrder.waiting)
+    await state.update_data(upload_order_id=order_id)
+    await call.message.answer(f"📎 Надішліть 2 MP3 файли для {order_id}")
+    await call.answer()
+
+
+async def _bind_audio_to_order(order_id: str, audio, message: Message, bot: Bot, state: FSMContext) -> None:
+    order = await db.get_order(order_id)
+    if not order:
+        await message.answer(f"⚠️ Замовлення {order_id} не знайдено.")
+        await state.clear()
         return
 
-    audio = message.audio or message.document
     filename = getattr(audio, "file_name", None) or ""
-
     variant = _detect_variant(filename)
     if variant is None:
-        await message.answer(
-            f"⚠️ Не можу визначити номер варіанту за назвою файлу «{filename}».\n"
-            "У назві має бути цифра 1 або 2. Наприклад: track_1.mp3"
-        )
-        return
+        # fallback: fill the next empty slot in upload order
+        if not order["variant1_file_id"]:
+            variant = 1
+        elif not order["variant2_file_id"]:
+            variant = 2
+        else:
+            variant = 1
 
-    order = await _find_active_order()
-    if not order:
-        await message.answer("⚠️ Немає активних замовлень зі статусом preview_sent.")
-        return
-
-    order_id = order["id"]
-    file_id = audio.file_id
-    await db.update_order(order_id, **{f"variant{variant}_file_id": file_id})
+    await db.update_order(order_id, **{f"variant{variant}_file_id": audio.file_id})
     await message.answer(f"✅ Варіант {variant} збережено для {order_id}.")
 
     order = await db.get_order(order_id)
     if order["variant1_file_id"] and order["variant2_file_id"]:
-        await message.answer(f"✅ Обидва варіанти завантажено. Надсилаю превью клієнту...")
+        await message.answer("✅ Обидва варіанти завантажено. Надсилаю превью клієнту...")
+        await state.clear()
         await _send_previews_to_client(bot, order)
     else:
         missing = 2 if not order["variant2_file_id"] else 1
-        await message.answer(f"⏳ Чекаю варіант {missing}...")
+        await message.answer(f"⏳ Чекаю варіант {missing} для {order_id}...")
 
 
-async def _find_active_order() -> dict | None:
-    """Find the most recent order with status preview_sent."""
-    import aiosqlite
-    from bot.db import DB_PATH
-    async with aiosqlite.connect(DB_PATH) as db_conn:
-        db_conn.row_factory = aiosqlite.Row
-        async with db_conn.execute(
-            "SELECT * FROM orders WHERE status='preview_sent' ORDER BY created_at DESC LIMIT 1"
-        ) as cur:
-            row = await cur.fetchone()
-            return dict(row) if row else None
+@router.message(UploadOrder.waiting, F.audio | F.document)
+async def handle_order_audio(message: Message, state: FSMContext, bot: Bot) -> None:
+    if not _is_admin(message.from_user.id):
+        return
+    data = await state.get_data()
+    order_id = data.get("upload_order_id")
+    if not order_id:
+        await state.clear()
+        await message.answer("⚠️ Не вибрано замовлення. Натисніть кнопку «📎 Завантажити файли» під потрібним замовленням.")
+        return
+    audio = message.audio or message.document
+    await _bind_audio_to_order(order_id, audio, message, bot, state)
+
+
+# ── Fallback: audio sent without picking an order ─────────────────────────
+
+@router.message(~StateFilter(UploadExamples.collecting, UploadOrder.waiting), F.audio | F.document)
+async def handle_admin_audio(message: Message, bot: Bot) -> None:
+    if not _is_admin(message.from_user.id):
+        return
+    await message.answer(
+        "⚠️ Спочатку натисніть кнопку «📎 Завантажити файли для ORDER-XXXX» "
+        "під потрібним замовленням, а потім надішліть файли."
+    )
 
 
 async def _claim_order(order_id: str) -> bool:

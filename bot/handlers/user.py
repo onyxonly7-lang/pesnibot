@@ -364,8 +364,16 @@ async def _run_generation(chat_id: int, data: dict, bot: Bot) -> None:
             f"{lyrics}\n"
             f"━━━━━━━━━━━━━━━"
         )
-        await bot.send_message(ADMIN_CHAT_ID, admin_text)
-        await bot.send_message(ADMIN_CHAT_ID, "Завантажте 2 аудіофайли")
+        await bot.send_message(
+            ADMIN_CHAT_ID,
+            admin_text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(
+                    text=f"📎 Завантажити файли для {order_id}",
+                    callback_data=f"upload:{order_id}",
+                )
+            ]]),
+        )
 
     # Animation and GPT run in parallel; animation always plays all steps
     await asyncio.gather(

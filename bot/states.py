@@ -14,3 +14,7 @@ class UploadExamples(StatesGroup):
     collecting = State()
 
 
+class UploadOrder(StatesGroup):
+    waiting = State()
+
+
