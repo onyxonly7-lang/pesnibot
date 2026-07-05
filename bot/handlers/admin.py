@@ -158,8 +158,10 @@ async def deliver_preview(bot: Bot, order: dict) -> None:
 
     await bot.send_message(
         user_id,
-        "🎵 Ваша пісня готова! Прослухайте превью 👆\n\n"
-        "Хочете отримати повну версію?",
+        "🎵 Ваша пісня готова! Прослухайте превью вище 👆\n\n"
+        "Це лише уривок — у повній версії пісня розкривається повністю "
+        "з усіма деталями вашої історії.\n\n"
+        "Натисніть кнопку Оплатити, щоб отримати повну версію!",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="💳 Оплатити 349 грн", url=pay_url)],
             [_manager_btn()],
