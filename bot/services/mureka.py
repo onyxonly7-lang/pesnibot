@@ -49,12 +49,20 @@ def _extract_audio_url(data: dict) -> str | None:
 
 
 async def _start_task(session: aiohttp.ClientSession, lyrics: str, prompt: str) -> str:
+    if not MUREKA_API_KEY:
+        raise RuntimeError("MUREKA_API_KEY is empty — set it in Railway Variables and .env")
+
     payload = {"lyrics": lyrics, "model": "auto", "prompt": prompt}
+    log.info("Mureka generate request: prompt=%r lyrics_len=%d", prompt, len(lyrics))
     async with session.post(_GENERATE_URL, json=payload, headers=_headers()) as resp:
         text = await resp.text()
+        log.info("Mureka generate response HTTP %s: %s", resp.status, text[:1000])
         if resp.status >= 400:
-            raise RuntimeError(f"Mureka generate HTTP {resp.status}: {text}")
-        data = json.loads(text)
+            raise RuntimeError(f"Mureka generate HTTP {resp.status}: {text[:500]}")
+        try:
+            data = json.loads(text)
+        except Exception:
+            raise RuntimeError(f"Mureka generate: non-JSON response: {text[:500]}")
     task_id = data.get("id") or data.get("task_id")
     if not task_id:
         raise RuntimeError(f"Mureka generate: no task id in response {data}")

@@ -389,12 +389,13 @@ async def _run_generation(chat_id: int, data: dict, bot: Bot) -> None:
             mureka.generate_track(lyrics, mureka_prompt),
             mureka.generate_track(lyrics, mureka_prompt),
         )
-    except Exception:
+    except Exception as e:
         log.exception("Mureka generation failed for order %s", order_id)
         await bot.send_message(
             ADMIN_CHAT_ID,
-            f"⚠️ Mureka не змогла згенерувати пісню для {order_id} "
-            f"(таймаут або помилка). Завантажте файли вручну 👇",
+            f"⚠️ Mureka не змогла згенерувати пісню для {order_id}.\n"
+            f"Причина: {type(e).__name__}: {str(e)[:600]}\n\n"
+            f"Завантажте файли вручну 👇",
             reply_markup=_admin_upload_kb(order_id),
         )
         return
