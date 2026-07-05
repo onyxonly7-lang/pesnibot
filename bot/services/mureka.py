@@ -118,8 +118,8 @@ _STYLE_BY_RECIPIENT = {
 }
 
 _MOOD_ADDON = {
-    "Душевна і зворушлива": "Emotional ballad with orchestral strings, soft piano, acoustic guitar, heartfelt and cinematic mood, slow tempo, touching and warm atmosphere",
-    "Весела і легка": "Upbeat pop song with acoustic guitar, light percussion, cheerful and positive mood, medium tempo, bright and energetic feel",
+    "Душевна і зворушлива": "pop rock, ballad, orchestral",
+    "Весела і легка": "indie pop, upbeat, electric guitar",
     "Сучасна і нестандартна": "modern production, contemporary sound, fresh and unexpected arrangement",
 }
 

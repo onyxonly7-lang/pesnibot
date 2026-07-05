@@ -312,10 +312,29 @@ async def msg_story_addition(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data == "start_generation", OrderForm.story_review)
 async def cb_start_generation(call: CallbackQuery, state: FSMContext, bot: Bot) -> None:
-    await call.answer()
+    # Move out of story_review immediately so repeat taps no longer match this handler
     await state.set_state(OrderForm.preview_requested)
+    await call.answer()
     data = await state.get_data()
+
+    # Remove the "🚀 Стартуємо!" button and confirm generation started — before any work
+    try:
+        await call.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await bot.send_message(
+        call.from_user.id,
+        "🎵 Ваша пісня створюється...\n"
+        "Це займе 2-3 хвилини. Ми надішлемо превью одразу як буде готово!",
+    )
+
     await _run_generation(call.from_user.id, data, bot)
+
+
+@router.callback_query(F.data == "start_generation")
+async def cb_start_generation_ignored(call: CallbackQuery) -> None:
+    # Generation already started (state moved past story_review) — ignore repeat taps
+    await call.answer("Пісня вже створюється, зачекайте 🙂")
 
 
 def _admin_upload_kb(order_id: str) -> InlineKeyboardMarkup:
@@ -368,14 +387,7 @@ async def _run_generation(chat_id: int, data: dict, bot: Bot) -> None:
     )
     await bot.send_message(ADMIN_CHAT_ID, admin_text, reply_markup=_admin_upload_kb(order_id))
 
-    # 4. Tell the client generation started
-    await bot.send_message(
-        chat_id,
-        "🎵 Ваша пісня створюється...\n"
-        "Це займе 2-3 хвилини. Ми надішлемо превью одразу як буде готово!",
-    )
-
-    # 5. One Mureka generation
+    # 4. One Mureka generation ("створюється" message already sent on button tap)
     try:
         mp3_bytes = await mureka.generate_track(lyrics, mureka_prompt)
     except Exception as e:
