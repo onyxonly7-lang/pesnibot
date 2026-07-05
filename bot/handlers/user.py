@@ -67,9 +67,9 @@ OCCASION_LABELS = {
 }
 
 MOOD_LABELS = {
-    "Весела і легка": "🌟 Весела і легка",
-    "Душевна і зворушлива": "❤️ Душевна і зворушлива",
-    "Сучасна і нестандартна": "🎸 Сучасна і нестандартна",
+    "Весела і легка": "Весела і легка",
+    "Душевна і зворушлива": "Душевна і зворушлива",
+    "Сучасна і нестандартна": "Сучасна і нестандартна",
 }
 
 VOICE_LABELS = {
@@ -189,14 +189,6 @@ async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
     await call.answer()
 
 
-async def _collapse_buttons(call: CallbackQuery, question: str, label: str) -> None:
-    """Remove the keyboard and leave only the question + chosen option."""
-    try:
-        await call.message.edit_text(f"{question}: {label}")
-    except Exception:
-        pass
-
-
 @router.callback_query(F.data.startswith("r:"), OrderForm.recipient)
 async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     recipient = call.data.split(":", 1)[1]
@@ -205,7 +197,6 @@ async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(data["order_id"], recipient=recipient)
     await db.log_event(call.from_user.id, "q1_recipient")
     await state.set_state(OrderForm.occasion)
-    await _collapse_buttons(call, "Для кого пісня?", RECIPIENT_LABELS.get(recipient, recipient))
     await call.message.answer("З якого приводу?\n\n", reply_markup=KB_OCCASION)
     await call.answer()
 
@@ -218,8 +209,7 @@ async def cb_occasion(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(data["order_id"], occasion=occasion)
     await db.log_event(call.from_user.id, "q2_occasion")
     await state.set_state(OrderForm.mood)
-    await _collapse_buttons(call, "З якого приводу?", OCCASION_LABELS.get(occasion, occasion))
-    await call.message.answer("Який настрій пісні? 🎭\n\n", reply_markup=KB_MOOD)
+    await call.message.answer("Який настрій пісні?\n\n", reply_markup=KB_MOOD)
     await call.answer()
 
 
@@ -231,7 +221,6 @@ async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(data["order_id"], mood=mood)
     await db.log_event(call.from_user.id, "q3_mood")
     await state.set_state(OrderForm.voice)
-    await _collapse_buttons(call, "Який настрій пісні? 🎭", MOOD_LABELS.get(mood, mood))
     await call.message.answer("Який голос потрібен?\n\n", reply_markup=KB_VOICE)
     await call.answer()
 
@@ -244,7 +233,6 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
     await db.update_order(data["order_id"], voice=voice)
     await db.log_event(call.from_user.id, "q4_voice")
     await state.set_state(OrderForm.story)
-    await _collapse_buttons(call, "Який голос потрібен?", VOICE_LABELS.get(voice, voice))
     await call.message.answer(
         "А тепер найважливіше — саме від цього залежить ваша пісня."
     )
