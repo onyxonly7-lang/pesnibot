@@ -1,6 +1,9 @@
+import logging
+
 from openai import AsyncOpenAI
 from bot.config import OPENAI_API_KEY
 
+log = logging.getLogger(__name__)
 _client = AsyncOpenAI(api_key=OPENAI_API_KEY)
 
 _PROMPT_TEMPLATE = """\
@@ -30,7 +33,13 @@ _PROMPT_TEMPLATE = """\
 Фоновий контекст для настрою (не обов'язково згадувати явно в тексті):
 - Кому пісня: {recipient}
 - Привід: {occasion}
-- Голос: {voice}\
+- Настрій: {mood}
+- Голос: {voice}
+
+Формат відповіді — поверни СТРОГО валідний JSON без markdown, без пояснень, \
+без ```:
+{{"lyrics": "<готовий текст пісні за структурою вище>", "mureka_prompt": \
+"<короткий музичний опис англійською, 1-2 речення>"}}\
 """
 
 
@@ -60,9 +69,29 @@ async def transcribe_voice(audio_bytes: bytes, filename: str = "voice.ogg") -> s
     return (response.text or "").strip()
 
 
+def _parse_lyrics(raw: str) -> str:
+    """Extract the lyrics from GPT's JSON reply (tolerant of stray markdown)."""
+    import json
+    text = raw.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    try:
+        data = json.loads(text)
+        lyrics = data.get("lyrics")
+        if lyrics:
+            return str(lyrics).strip()
+    except Exception:
+        log.warning("GPT reply is not valid JSON, using raw text as lyrics")
+    return raw.strip()
+
+
 async def generate_lyrics(
     recipient: str,
     occasion: str,
+    mood: str,
     voice: str,
     story: str,
 ) -> str:
@@ -70,11 +99,14 @@ async def generate_lyrics(
         history=story,
         recipient=recipient,
         occasion=occasion,
+        mood=mood,
         voice=voice,
     )
     response = await _client.chat.completions.create(
         model="gpt-4o",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.9,
+        response_format={"type": "json_object"},
     )
-    return _trim_to_limit(response.choices[0].message.content.strip())
+    lyrics = _parse_lyrics(response.choices[0].message.content or "")
+    return _trim_to_limit(lyrics)

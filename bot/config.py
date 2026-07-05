@@ -6,6 +6,7 @@ load_dotenv()
 BOT_TOKEN: str = os.environ["BOT_TOKEN"]
 OPENAI_API_KEY: str = os.environ["OPENAI_API_KEY"]
 ADMIN_CHAT_ID: int = int(os.environ["ADMIN_CHAT_ID"])
+MUREKA_API_KEY: str = os.getenv("MUREKA_API_KEY", "")
 WFP_MERCHANT_ACCOUNT: str = os.getenv("WFP_MERCHANT_ACCOUNT", "")
 WFP_MERCHANT_SECRET: str = os.getenv("WFP_MERCHANT_SECRET", "")
 WEBHOOK_URL: str = os.getenv("WEBHOOK_URL", "")

@@ -4,6 +4,7 @@ from aiogram.fsm.state import State, StatesGroup
 class OrderForm(StatesGroup):
     recipient = State()
     occasion = State()
+    mood = State()
     voice = State()
     story = State()
     story_review = State()

@@ -21,9 +21,11 @@ async def init_db() -> None:
                 username TEXT,
                 recipient TEXT,
                 occasion TEXT,
+                mood TEXT,
                 voice TEXT,
                 story TEXT,
                 lyrics TEXT,
+                mureka_prompt TEXT,
                 edit_used INTEGER DEFAULT 0,
                 variant1_file_id TEXT,
                 variant2_file_id TEXT,
@@ -32,6 +34,12 @@ async def init_db() -> None:
                 created_at TEXT
             )
         """)
+        # Migrations for existing DBs: add columns if missing
+        async with db.execute("PRAGMA table_info(orders)") as cur:
+            existing = {row[1] for row in await cur.fetchall()}
+        for col in ("mood", "mureka_prompt"):
+            if col not in existing:
+                await db.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT")
         await db.commit()
 
 

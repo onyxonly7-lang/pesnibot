@@ -5,6 +5,7 @@ from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import (
+    BufferedInputFile,
     CallbackQuery,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
@@ -13,7 +14,7 @@ from aiogram.types import (
 
 from bot import db
 from bot.config import ADMIN_CHAT_ID, MANAGER_USERNAME
-from bot.services import gpt
+from bot.services import gpt, mureka
 from bot.services.wayforpay import create_invoice
 from bot.states import OrderForm
 
@@ -65,6 +66,12 @@ OCCASION_LABELS = {
     "Інший привід": "🎊 Інший привід",
 }
 
+MOOD_LABELS = {
+    "Весела і легка": "🌟 Весела і легка",
+    "Душевна і зворушлива": "❤️ Душевна і зворушлива",
+    "Сучасна і нестандартна": "🎸 Сучасна і нестандартна",
+}
+
 VOICE_LABELS = {
     "Чоловічий": "Чоловічий",
     "Жіночий": "Жіночий",
@@ -82,6 +89,11 @@ def _grid2(labels: dict[str, str], prefix: str) -> InlineKeyboardMarkup:
 KB_RECIPIENT = _grid2(RECIPIENT_LABELS, "r")
 KB_OCCASION = _grid2(OCCASION_LABELS, "o")
 
+KB_MOOD = InlineKeyboardMarkup(inline_keyboard=[
+    [InlineKeyboardButton(text=label, callback_data=f"m:{value}")]
+    for value, label in MOOD_LABELS.items()
+])
+
 KB_VOICE = InlineKeyboardMarkup(inline_keyboard=[
     [InlineKeyboardButton(text=label, callback_data=f"v:{value}")]
     for value, label in VOICE_LABELS.items()
@@ -98,40 +110,6 @@ def kb_payment_failed(order_id: str) -> InlineKeyboardMarkup:
         [InlineKeyboardButton(text="🏦 Банківський переказ", callback_data=f"bank:{order_id}")],
         [_manager_btn()],
     ])
-
-
-# ── progress animation ────────────────────────────────────────────────────
-
-_PROGRESS_STEPS = [
-    (27, "📖 Аналізуємо вашу історію…\nШукаємо найважливіші моменти, щоб пісня була саме про вас.\n⏳"),
-    (35, "✍️ Створюємо текст пісні…\nПеретворюємо ваші спогади на рядки, які легко лягають на музику.\n⏳"),
-    (35, "🎼 Підбираємо мелодію та настрій…\nВаша історія може звучати зовсім по-різному, тому ми підбираємо найкращий варіант.\n⏳"),
-    (35, "🎤 Створюємо вокал…\nНамагаємося, щоб голос і подача максимально передавали емоції вашої історії.\n⏳"),
-    (35, "✨ Майже готово…\nПеревіряємо фінальний результат і готуємо два музичні варіанти для прослуховування.\n⏳"),
-]
-
-
-async def _run_progress(chat_id: int, bot: Bot) -> None:
-    """Show all progress steps; intermediate steps edit one message, last step is a new message."""
-    msg = await bot.send_message(
-        chat_id,
-        "🎵 Починаємо створення вашої пісні.\n"
-        "Це займе приблизно 5–10 хвилин. Ми повідомимо, щойно все буде готово.\n⏳",
-    )
-    *intermediate, (last_delay, last_text) = _PROGRESS_STEPS
-    for delay, text in intermediate:
-        await asyncio.sleep(delay)
-        try:
-            await bot.edit_message_text(text, chat_id=chat_id, message_id=msg.message_id)
-        except Exception:
-            pass
-    # Last step: delete the edited message and send a NEW one so Telegram triggers a notification
-    await asyncio.sleep(last_delay)
-    try:
-        await bot.delete_message(chat_id=chat_id, message_id=msg.message_id)
-    except Exception:
-        pass
-    await bot.send_message(chat_id, last_text)
 
 
 # ── /start ────────────────────────────────────────────────────────────────
@@ -236,8 +214,20 @@ async def cb_occasion(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(occasion=occasion)
     data = await state.get_data()
     await db.update_order(data["order_id"], occasion=occasion)
-    await state.set_state(OrderForm.voice)
+    await state.set_state(OrderForm.mood)
     await _collapse_buttons(call, "З якого приводу?", OCCASION_LABELS.get(occasion, occasion))
+    await call.message.answer("Який настрій пісні? 🎭\n\n", reply_markup=KB_MOOD)
+    await call.answer()
+
+
+@router.callback_query(F.data.startswith("m:"), OrderForm.mood)
+async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
+    mood = call.data.split(":", 1)[1]
+    await state.update_data(mood=mood)
+    data = await state.get_data()
+    await db.update_order(data["order_id"], mood=mood)
+    await state.set_state(OrderForm.voice)
+    await _collapse_buttons(call, "Який настрій пісні? 🎭", MOOD_LABELS.get(mood, mood))
     await call.message.answer("Який голос потрібен?\n\n", reply_markup=KB_VOICE)
     await call.answer()
 
@@ -336,57 +326,97 @@ async def cb_start_generation(call: CallbackQuery, state: FSMContext, bot: Bot) 
     await _run_generation(call.from_user.id, data, bot)
 
 
+def _admin_upload_kb(order_id: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(
+            text=f"📎 Завантажити файли вручну для {order_id}",
+            callback_data=f"upload:{order_id}",
+        )
+    ]])
+
+
 async def _run_generation(chat_id: int, data: dict, bot: Bot) -> None:
     order_id = data["order_id"]
     story = data.get("story", "")
-    gpt_error: list[Exception] = []
+    recipient = data.get("recipient", "")
+    occasion = data.get("occasion", "")
+    mood = data.get("mood", "")
+    voice = data.get("voice", "")
 
-    async def _generate() -> None:
-        try:
-            lyrics = await gpt.generate_lyrics(
-                data["recipient"], data["occasion"], data["voice"], story
-            )
-        except Exception as e:
-            log.exception("GPT error for order %s", order_id)
-            gpt_error.append(e)
-            return
-        await db.update_order(order_id, lyrics=lyrics, status="preview_sent")
-        order = await db.get_order(order_id)
-        admin_text = (
-            f"🎵 Нове замовлення на музичне превью\n\n"
-            f"Замовлення: {order_id}\n"
-            f"Telegram: @{order['username']} / {order['user_id']}\n"
-            f"Кому: {order['recipient']}\n"
-            f"Привід: {order['occasion']}\n"
-            f"Голос: {order['voice']}\n\n"
-            f"━━━━━━━━━━━━━━━\n"
-            f"📝 Текст пісні:\n"
-            f"{lyrics}\n"
-            f"━━━━━━━━━━━━━━━"
-        )
-        await bot.send_message(
-            ADMIN_CHAT_ID,
-            admin_text,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(
-                    text=f"📎 Завантажити файли для {order_id}",
-                    callback_data=f"upload:{order_id}",
-                )
-            ]]),
-        )
-
-    # Animation and GPT run in parallel; animation always plays all steps
-    await asyncio.gather(
-        _run_progress(chat_id, bot),
-        _generate(),
-    )
-
-    if gpt_error:
+    # 1. Lyrics via GPT (JSON → lyrics)
+    try:
+        lyrics = await gpt.generate_lyrics(recipient, occasion, mood, voice, story)
+    except Exception:
+        log.exception("GPT error for order %s", order_id)
         await bot.send_message(
             chat_id,
             "⚠️ Виникла помилка під час генерації тексту. Спробуйте ще раз або зверніться до менеджера.",
             reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
         )
+        return
+
+    # 2. Deterministic Mureka style prompt (recipient + mood + voice)
+    mureka_prompt = mureka.build_mureka_prompt(recipient, mood, voice)
+    await db.update_order(order_id, lyrics=lyrics, mureka_prompt=mureka_prompt, status="preview_sent")
+    order = await db.get_order(order_id)
+
+    # 3. Notify admin: order + lyrics + mureka_prompt + manual-upload fallback button
+    admin_text = (
+        f"🎵 Нове замовлення на музичне превью\n\n"
+        f"Замовлення: {order_id}\n"
+        f"Telegram: @{order['username']} / {order['user_id']}\n"
+        f"Кому: {recipient}\n"
+        f"Привід: {occasion}\n"
+        f"Настрій: {mood}\n"
+        f"Голос: {voice}\n\n"
+        f"🎚 Mureka prompt:\n{mureka_prompt}\n\n"
+        f"━━━━━━━━━━━━━━━\n"
+        f"📝 Текст пісні:\n{lyrics}\n"
+        f"━━━━━━━━━━━━━━━"
+    )
+    await bot.send_message(ADMIN_CHAT_ID, admin_text, reply_markup=_admin_upload_kb(order_id))
+
+    # 4. Tell the client generation started
+    await bot.send_message(
+        chat_id,
+        "🎵 Ваша пісня створюється...\n"
+        "Це займе близько 5 хвилин. Ми надішлемо превью одразу як буде готово!",
+    )
+
+    # 5. Two independent Mureka generations (Variant 1 + Variant 2)
+    try:
+        tracks = await asyncio.gather(
+            mureka.generate_track(lyrics, mureka_prompt),
+            mureka.generate_track(lyrics, mureka_prompt),
+        )
+    except Exception:
+        log.exception("Mureka generation failed for order %s", order_id)
+        await bot.send_message(
+            ADMIN_CHAT_ID,
+            f"⚠️ Mureka не змогла згенерувати пісню для {order_id} "
+            f"(таймаут або помилка). Завантажте файли вручну 👇",
+            reply_markup=_admin_upload_kb(order_id),
+        )
+        return
+
+    # 6. Upload full tracks to Telegram to obtain persistent file_ids
+    #    (first downloaded = Варіант 1, second = Варіант 2)
+    file_ids: list[str] = []
+    for i, mp3_bytes in enumerate(tracks, start=1):
+        sent = await bot.send_audio(
+            ADMIN_CHAT_ID,
+            audio=BufferedInputFile(mp3_bytes, filename=f"{order_id}_variant{i}.mp3"),
+            title=f"{order_id} — Варіант {i} (повна версія)",
+        )
+        media = sent.audio or sent.document
+        file_ids.append(media.file_id)
+
+    await db.update_order(order_id, variant1_file_id=file_ids[0], variant2_file_id=file_ids[1])
+
+    # 7. Send previews to the client via the existing preview pipeline
+    from bot.handlers.admin import _send_previews_to_client
+    order = await db.get_order(order_id)
+    await _send_previews_to_client(bot, order)
 
 
 # ── variant selection & payment ───────────────────────────────────────────
