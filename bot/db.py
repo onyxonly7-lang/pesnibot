@@ -1,3 +1,4 @@
+import logging
 import os
 import aiosqlite
 import uuid
@@ -34,6 +35,17 @@ async def init_db() -> None:
                 created_at TEXT
             )
         """)
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER,
+                event TEXT,
+                created_at TEXT
+            )
+        """)
+        await db.execute(
+            "CREATE INDEX IF NOT EXISTS idx_events_event_time ON events(event, created_at)"
+        )
         # Migrations for existing DBs: add columns if missing
         async with db.execute("PRAGMA table_info(orders)") as cur:
             existing = {row[1] for row in await cur.fetchall()}
@@ -41,6 +53,20 @@ async def init_db() -> None:
             if col not in existing:
                 await db.execute(f"ALTER TABLE orders ADD COLUMN {col} TEXT")
         await db.commit()
+
+
+async def log_event(user_id: int, event: str) -> None:
+    """Record a funnel event for a user. Best-effort — never breaks the flow."""
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute(
+                "INSERT INTO events (user_id, event, created_at) VALUES (?, ?, ?)",
+                (user_id, event, now),
+            )
+            await db.commit()
+    except Exception:
+        logging.getLogger(__name__).exception("log_event failed: %s / %s", user_id, event)
 
 
 def _new_order_id() -> str:

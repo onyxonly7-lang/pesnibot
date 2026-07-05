@@ -152,6 +152,7 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
         return
 
     user_id = order["user_id"]
+    await db.log_event(user_id, "preview")
 
     await bot.send_message(
         user_id,

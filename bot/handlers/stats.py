@@ -7,7 +7,14 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from bot.config import ADMIN_CHAT_ID
-from bot.services.stats import daily_stats, monthly_stats, format_daily, format_monthly
+from bot.services.stats import (
+    daily_stats,
+    monthly_stats,
+    funnel_stats,
+    format_daily,
+    format_monthly,
+    format_funnel,
+)
 
 log = logging.getLogger(__name__)
 router = Router()
@@ -21,6 +28,16 @@ def _is_admin(user_id: int) -> bool:
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message) -> None:
+    if not _is_admin(message.from_user.id):
+        return
+    s = await funnel_stats()
+    await message.answer(format_funnel(s))
+
+
+# ── /stats_orders (old order-status summary) ──────────────────────────────
+
+@router.message(Command("stats_orders"))
+async def cmd_stats_orders(message: Message) -> None:
     if not _is_admin(message.from_user.id):
         return
     s = await daily_stats()

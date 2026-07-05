@@ -184,6 +184,7 @@ async def cb_start_order(call: CallbackQuery, state: FSMContext) -> None:
     order_id = await db.create_order(call.from_user.id, call.from_user.username or "")
     await state.update_data(order_id=order_id)
     await state.set_state(OrderForm.recipient)
+    await db.log_event(call.from_user.id, "start")
     await call.message.answer("Для кого пісня?\n\n", reply_markup=KB_RECIPIENT)
     await call.answer()
 
@@ -202,6 +203,7 @@ async def cb_recipient(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(recipient=recipient)
     data = await state.get_data()
     await db.update_order(data["order_id"], recipient=recipient)
+    await db.log_event(call.from_user.id, "q1_recipient")
     await state.set_state(OrderForm.occasion)
     await _collapse_buttons(call, "Для кого пісня?", RECIPIENT_LABELS.get(recipient, recipient))
     await call.message.answer("З якого приводу?\n\n", reply_markup=KB_OCCASION)
@@ -214,6 +216,7 @@ async def cb_occasion(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(occasion=occasion)
     data = await state.get_data()
     await db.update_order(data["order_id"], occasion=occasion)
+    await db.log_event(call.from_user.id, "q2_occasion")
     await state.set_state(OrderForm.mood)
     await _collapse_buttons(call, "З якого приводу?", OCCASION_LABELS.get(occasion, occasion))
     await call.message.answer("Який настрій пісні? 🎭\n\n", reply_markup=KB_MOOD)
@@ -226,6 +229,7 @@ async def cb_mood(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(mood=mood)
     data = await state.get_data()
     await db.update_order(data["order_id"], mood=mood)
+    await db.log_event(call.from_user.id, "q3_mood")
     await state.set_state(OrderForm.voice)
     await _collapse_buttons(call, "Який настрій пісні? 🎭", MOOD_LABELS.get(mood, mood))
     await call.message.answer("Який голос потрібен?\n\n", reply_markup=KB_VOICE)
@@ -238,6 +242,7 @@ async def cb_voice(call: CallbackQuery, state: FSMContext) -> None:
     await state.update_data(voice=voice)
     data = await state.get_data()
     await db.update_order(data["order_id"], voice=voice)
+    await db.log_event(call.from_user.id, "q4_voice")
     await state.set_state(OrderForm.story)
     await _collapse_buttons(call, "Який голос потрібен?", VOICE_LABELS.get(voice, voice))
     await call.message.answer(
@@ -270,6 +275,7 @@ async def _save_first_story(message: Message, state: FSMContext, story: str) -> 
     await state.update_data(story=story)
     data = await state.get_data()
     await db.update_order(data["order_id"], story=story)
+    await db.log_event(message.from_user.id, "story")
     await state.set_state(OrderForm.story_review)
     await message.answer(
         "✅ Ми зберегли вашу історію.\n"
@@ -436,6 +442,7 @@ async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
         await call.answer("Це замовлення вже оплачено.", show_alert=True)
         return
     await db.update_order(order_id, chosen_variant=variant, status="chosen")
+    await db.log_event(call.from_user.id, "chosen")
     await call.answer()
 
     try:
@@ -500,6 +507,7 @@ async def _deliver_full_track(bot: Bot, order_id: str, reply_to: Message | None 
     await db.update_order(order_id, status="paid")
     uid = order["user_id"]
     chosen = order["chosen_variant"]
+    await db.log_event(uid, "paid")
 
     await bot.send_message(
         uid,

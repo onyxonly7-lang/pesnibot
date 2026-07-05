@@ -124,6 +124,75 @@ def format_daily(s: dict) -> str:
     )
 
 
+# ── funnel stats ──────────────────────────────────────────────────────────
+
+_KYIV = timezone(timedelta(hours=3))
+
+# (event key, display label) in funnel order
+_FUNNEL = [
+    ("start", "▶️ Старт"),
+    ("q1_recipient", "1️⃣ Кому"),
+    ("q2_occasion", "2️⃣ Привід"),
+    ("q3_mood", "3️⃣ Настрій"),
+    ("q4_voice", "4️⃣ Голос"),
+    ("story", "📖 Історія"),
+    ("preview", "🎧 Превью"),
+    ("chosen", "💛 Вибір варіанту"),
+    ("paid", "💳 Оплата"),
+]
+
+
+def _kyiv_day_start_utc(now_utc: datetime) -> datetime:
+    """Start of the current 'day' = latest 21:00 Kyiv boundary at or before now."""
+    now_kyiv = now_utc.astimezone(_KYIV)
+    boundary = now_kyiv.replace(hour=21, minute=0, second=0, microsecond=0)
+    if now_kyiv < boundary:
+        boundary -= timedelta(days=1)
+    return boundary.astimezone(timezone.utc)
+
+
+async def _event_counts(since: str | None, until: str | None) -> dict[str, int]:
+    """Distinct users per event; optionally within [since, until)."""
+    if since is not None and until is not None:
+        rows = await _fetch(
+            "SELECT event, COUNT(DISTINCT user_id) AS c FROM events "
+            "WHERE created_at >= ? AND created_at < ? GROUP BY event",
+            (since, until),
+        )
+    else:
+        rows = await _fetch(
+            "SELECT event, COUNT(DISTINCT user_id) AS c FROM events GROUP BY event"
+        )
+    return {r["event"]: r["c"] for r in rows}
+
+
+async def funnel_stats() -> dict:
+    now = datetime.now(timezone.utc)
+    day_start = _kyiv_day_start_utc(now)
+    today = await _event_counts(day_start.isoformat(), now.isoformat())
+    alltime = await _event_counts(None, None)
+    return {"today": today, "alltime": alltime}
+
+
+def _funnel_block(counts: dict[str, int]) -> str:
+    lines = [f"{label}: {counts.get(key, 0)}" for key, label in _FUNNEL]
+    start = counts.get("start", 0)
+    paid = counts.get("paid", 0)
+    conv = (paid / start * 100) if start else 0.0
+    lines.append(f"📈 Конверсія старт→оплата: {conv:.1f}%")
+    return "\n".join(lines)
+
+
+def format_funnel(s: dict) -> str:
+    return (
+        "📊 Статистика воронки\n\n"
+        "🗓 Сьогодні (з 21:00 вчора до зараз):\n"
+        f"{_funnel_block(s['today'])}\n\n"
+        "♾ За весь час:\n"
+        f"{_funnel_block(s['alltime'])}"
+    )
+
+
 def format_monthly(s: dict) -> str:
     date_str = s["date"].strftime("%m.%Y")
     return (
