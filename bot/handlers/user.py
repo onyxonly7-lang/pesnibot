@@ -15,7 +15,6 @@ from aiogram.types import (
 from bot import db
 from bot.config import ADMIN_CHAT_ID, MANAGER_USERNAME
 from bot.services import gpt, mureka
-from bot.services.wayforpay import create_invoice
 from bot.states import OrderForm
 
 log = logging.getLogger(__name__)
@@ -67,9 +66,8 @@ OCCASION_LABELS = {
 }
 
 MOOD_LABELS = {
-    "Весела і легка": "Весела і легка",
     "Душевна і зворушлива": "Душевна і зворушлива",
-    "Сучасна і нестандартна": "Сучасна і нестандартна",
+    "Весела і легка": "Весела і легка",
 }
 
 VOICE_LABELS = {
@@ -374,86 +372,39 @@ async def _run_generation(chat_id: int, data: dict, bot: Bot) -> None:
     await bot.send_message(
         chat_id,
         "🎵 Ваша пісня створюється...\n"
-        "Це займе близько 5 хвилин. Ми надішлемо превью одразу як буде готово!",
+        "Це займе 2-3 хвилини. Ми надішлемо превью одразу як буде готово!",
     )
 
-    # 5. Two independent Mureka generations (Variant 1 + Variant 2)
+    # 5. One Mureka generation
     try:
-        tracks = await asyncio.gather(
-            mureka.generate_track(lyrics, mureka_prompt),
-            mureka.generate_track(lyrics, mureka_prompt),
-        )
+        mp3_bytes = await mureka.generate_track(lyrics, mureka_prompt)
     except Exception as e:
         log.exception("Mureka generation failed for order %s", order_id)
         await bot.send_message(
             ADMIN_CHAT_ID,
             f"⚠️ Mureka не змогла згенерувати пісню для {order_id}.\n"
             f"Причина: {type(e).__name__}: {str(e)[:600]}\n\n"
-            f"Завантажте файли вручну 👇",
+            f"Завантажте файл вручну 👇",
             reply_markup=_admin_upload_kb(order_id),
         )
         return
 
-    # 6. Upload full tracks to Telegram to obtain persistent file_ids
-    #    (first downloaded = Варіант 1, second = Варіант 2)
-    file_ids: list[str] = []
-    for i, mp3_bytes in enumerate(tracks, start=1):
-        sent = await bot.send_audio(
-            ADMIN_CHAT_ID,
-            audio=BufferedInputFile(mp3_bytes, filename=f"{order_id}_variant{i}.mp3"),
-            title=f"{order_id} — Варіант {i} (повна версія)",
-        )
-        media = sent.audio or sent.document
-        file_ids.append(media.file_id)
-
-    await db.update_order(order_id, variant1_file_id=file_ids[0], variant2_file_id=file_ids[1])
-
-    # 7. Send previews to the client via the existing preview pipeline
-    from bot.handlers.admin import _send_previews_to_client
-    order = await db.get_order(order_id)
-    await _send_previews_to_client(bot, order)
-
-
-# ── variant selection & payment ───────────────────────────────────────────
-
-@router.callback_query(F.data.startswith("choose:"))
-async def cb_choose_variant(call: CallbackQuery, state: FSMContext) -> None:
-    variant = int(call.data.split(":")[1])
-    data = await state.get_data()
-    order_id = data.get("order_id", "")
-    if not order_id:
-        order = await db.get_latest_order_for_user(call.from_user.id)
-        if order:
-            order_id = order["id"]
-    order = await db.get_order(order_id)
-    if order and order["status"] == "paid":
-        await call.answer("Це замовлення вже оплачено.", show_alert=True)
-        return
-    await db.update_order(order_id, chosen_variant=variant, status="chosen")
-    await db.log_event(call.from_user.id, "chosen")
-    await call.answer()
-
-    try:
-        pay_url = await create_invoice(order_id)
-    except Exception:
-        log.exception("Failed to create WayForPay invoice for order %s", order_id)
-        await call.message.answer(
-            "⚠️ Не вдалося сформувати посилання на оплату. "
-            "Будь ласка, зверніться до менеджера.",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
-        )
-        return
-
-    await call.message.answer(
-        "❤️ Чудовий вибір!\n\n"
-        "Ваша пісня вже повністю готова.\n\n"
-        "Щоб отримати повну версію без обмежень, натисніть кнопку оплатити 👇",
-        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="💳 Оплатити пісню — 349 грн", url=pay_url)],
-            [_manager_btn()],
-        ]),
+    # 6. Upload full track to Telegram for a persistent file_id
+    sent = await bot.send_audio(
+        ADMIN_CHAT_ID,
+        audio=BufferedInputFile(mp3_bytes, filename=f"{order_id}.mp3"),
+        title=f"{order_id} (повна версія)",
     )
+    media = sent.audio or sent.document
+    await db.update_order(order_id, variant1_file_id=media.file_id)
 
+    # 7. Send the preview + payment button to the client
+    from bot.handlers.admin import deliver_preview
+    order = await db.get_order(order_id)
+    await deliver_preview(bot, order)
+
+
+# ── payment ────────────────────────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("bank:"))
 async def cb_bank(call: CallbackQuery) -> None:

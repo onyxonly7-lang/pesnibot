@@ -1,5 +1,4 @@
 import logging
-import re
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command, StateFilter
@@ -15,6 +14,7 @@ from aiogram.types import (
 from bot import db
 from bot.config import ADMIN_CHAT_ID
 from bot.services.audio import make_preview
+from bot.services.wayforpay import create_invoice
 from bot.states import UploadExamples, UploadOrder
 
 log = logging.getLogger(__name__)
@@ -38,24 +38,6 @@ def _is_admin(user_id: int) -> bool:
     return user_id == ADMIN_CHAT_ID
 
 
-def _detect_variant(filename: str) -> int | None:
-    """Return 1 or 2 based on digits found in the filename, or None if unclear."""
-    digits = re.findall(r"\d+", filename)
-    for d in digits:
-        if "1" in d and "2" not in d:
-            return 1
-        if "2" in d and "1" not in d:
-            return 2
-    # fallback: last digit sequence
-    if digits:
-        last = digits[-1]
-        if last.endswith("1"):
-            return 1
-        if last.endswith("2"):
-            return 2
-    return None
-
-
 # ── Upload files for a specific order (via inline button) ─────────────────
 
 @router.callback_query(F.data.startswith("upload:"))
@@ -70,7 +52,7 @@ async def cb_upload_files(call: CallbackQuery, state: FSMContext) -> None:
         return
     await state.set_state(UploadOrder.waiting)
     await state.update_data(upload_order_id=order_id)
-    await call.message.answer(f"📎 Надішліть 2 MP3 файли для {order_id}")
+    await call.message.answer(f"📎 Надішліть MP3 файл для {order_id}")
     await call.answer()
 
 
@@ -81,28 +63,12 @@ async def _bind_audio_to_order(order_id: str, audio, message: Message, bot: Bot,
         await state.clear()
         return
 
-    filename = getattr(audio, "file_name", None) or ""
-    variant = _detect_variant(filename)
-    if variant is None:
-        # fallback: fill the next empty slot in upload order
-        if not order["variant1_file_id"]:
-            variant = 1
-        elif not order["variant2_file_id"]:
-            variant = 2
-        else:
-            variant = 1
-
-    await db.update_order(order_id, **{f"variant{variant}_file_id": audio.file_id})
-    await message.answer(f"✅ Варіант {variant} збережено для {order_id}.")
+    await db.update_order(order_id, variant1_file_id=audio.file_id)
+    await state.clear()
+    await message.answer(f"✅ Файл збережено для {order_id}. Надсилаю превью клієнту...")
 
     order = await db.get_order(order_id)
-    if order["variant1_file_id"] and order["variant2_file_id"]:
-        await message.answer("✅ Обидва варіанти завантажено. Надсилаю превью клієнту...")
-        await state.clear()
-        await _send_previews_to_client(bot, order)
-    else:
-        missing = 2 if not order["variant2_file_id"] else 1
-        await message.answer(f"⏳ Чекаю варіант {missing} для {order_id}...")
+    await deliver_preview(bot, order)
 
 
 @router.message(UploadOrder.waiting, F.audio | F.document)
@@ -144,7 +110,12 @@ async def _claim_order(order_id: str) -> bool:
         return db_conn.total_changes > 0
 
 
-async def _send_previews_to_client(bot: Bot, order: dict) -> None:
+def _manager_btn() -> InlineKeyboardButton:
+    return InlineKeyboardButton(text="💬 Звʼязатися з менеджером", url="https://t.me/Studio24pro")
+
+
+async def deliver_preview(bot: Bot, order: dict) -> None:
+    """Cut a 45s preview of the single track, send it + the payment button."""
     order_id = order["id"]
 
     if not await _claim_order(order_id):
@@ -154,41 +125,46 @@ async def _send_previews_to_client(bot: Bot, order: dict) -> None:
     user_id = order["user_id"]
     await db.log_event(user_id, "preview")
 
+    file_id = order["variant1_file_id"]
+    try:
+        tg_file = await bot.get_file(file_id)
+        downloaded = await bot.download_file(tg_file.file_path)
+        preview_bytes = await make_preview(downloaded.read())
+        await bot.send_audio(
+            user_id,
+            audio=BufferedInputFile(preview_bytes, filename="Превью.mp3"),
+            title="Превью",
+        )
+    except Exception:
+        log.exception("Preview error: order=%s", order_id)
+        await bot.send_message(user_id, "(Помилка генерації превью — зверніться до менеджера)")
+        await db.update_order(order_id, status="previewing")
+        return
+
+    # Single track → this is the track delivered after payment
+    await db.update_order(order_id, chosen_variant=1, status="chosen")
+
+    try:
+        pay_url = await create_invoice(order_id)
+    except Exception:
+        log.exception("Failed to create WayForPay invoice for order %s", order_id)
+        await bot.send_message(
+            user_id,
+            "🎵 Ваша пісня готова! Прослухайте превью 👆\n\n"
+            "⚠️ Не вдалося сформувати посилання на оплату. Зверніться до менеджера.",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[[_manager_btn()]]),
+        )
+        return
+
     await bot.send_message(
         user_id,
-        "🎧 Ваше музичне превью готове.\n\n"
-        "Послухайте два варіанти і оберіть той, який сподобався більше.",
+        "🎵 Ваша пісня готова! Прослухайте превью 👆\n\n"
+        "Хочете отримати повну версію?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="💳 Оплатити 349 грн", url=pay_url)],
+            [_manager_btn()],
+        ]),
     )
-
-    all_ok = True
-    for variant_num in (1, 2):
-        file_id = order[f"variant{variant_num}_file_id"]
-        try:
-            tg_file = await bot.get_file(file_id)
-            downloaded = await bot.download_file(tg_file.file_path)
-            preview_bytes = await make_preview(downloaded.read())
-            audio_input = BufferedInputFile(preview_bytes, filename=f"Варіант {variant_num}.mp3")
-            await bot.send_audio(
-                user_id,
-                audio=audio_input,
-                title=f"Варіант {variant_num}",
-            )
-        except Exception:
-            log.exception("Preview error: variant=%s order=%s", variant_num, order_id)
-            await bot.send_message(user_id, f"(Варіант {variant_num} — помилка генерації превью)")
-            all_ok = False
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🎵 Обираю варіант 1", callback_data="choose:1")],
-        [InlineKeyboardButton(text="🎵 Обираю варіант 2", callback_data="choose:2")],
-    ])
-    await bot.send_message(
-        user_id,
-        "Який варіант вам більше сподобався?\n",
-        reply_markup=kb,
-    )
-
-    await db.update_order(order_id, status="chosen" if all_ok else "previewing")
 
 
 # ── /upload_examples ──────────────────────────────────────────────────────
