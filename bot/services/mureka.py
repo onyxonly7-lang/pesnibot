@@ -119,7 +119,7 @@ _STYLE_BY_RECIPIENT = {
 
 _MOOD_ADDON = {
     "Душевна і зворушлива": "pop rock, ballad, orchestral",
-    "Весела і легка": "indie pop, upbeat, electric guitar",
+    "Весела і легка": "pop rock, acoustic guitar, romantic",
     "Сучасна і нестандартна": "modern production, contemporary sound, fresh and unexpected arrangement",
 }
 
@@ -131,9 +131,12 @@ _VOCAL_SUFFIX = {
 
 
 def build_mureka_prompt(recipient: str, mood: str, voice: str) -> str:
-    """Compose the Mureka style prompt from recipient + mood + voice."""
-    base = _STYLE_BY_RECIPIENT.get(recipient, _STYLE_BY_RECIPIENT["Інше"])
-    parts = [base]
+    """Compose the Mureka style prompt from mood + voice.
+
+    Note: `recipient` / _STYLE_BY_RECIPIENT are intentionally NOT used anymore —
+    kept in the module for reference only.
+    """
+    parts = []
     addon = _MOOD_ADDON.get(mood)
     if addon:
         parts.append(addon)
